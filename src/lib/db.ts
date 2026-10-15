@@ -72,10 +72,16 @@ function migrate(db: Database.Database) {
     );
   }
 
-  // Rename legacy aisle "Vin" → "Drikkevare/Snacks" (same slot in aisle order)
+  // Rename legacy aisles to current labels
   db.prepare(
     `UPDATE items SET aisle = ? WHERE aisle = ?`,
   ).run("Drikkevare/Snacks", "Vin");
+  db.prepare(
+    `UPDATE items SET aisle = ? WHERE aisle = ?`,
+  ).run("Animal", "Kød/fisk");
+  db.prepare(
+    `UPDATE items SET aisle = ? WHERE aisle = ?`,
+  ).run("Animal", "Kød/Fisk");
 
   // Backfill stable per-aisle order for rows still at 0 collision
   const households = db

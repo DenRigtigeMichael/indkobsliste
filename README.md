@@ -36,7 +36,7 @@ Grønt
 Tørvare
 Hygiejne
 Mælkeprodukter
-Kød/fisk
+Animal
 Drikkevare/Snacks
 Husholdning
 ```
@@ -52,6 +52,7 @@ Husholdning
    ```
 
 Gamle varer med afdelingen `Vin` omdøbes automatisk til `Drikkevare/Snacks`.
+Gamle varer med afdelingen `Kød/fisk` omdøbes automatisk til `Animal`.
 
 ## Scripts
 

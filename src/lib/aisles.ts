@@ -7,7 +7,7 @@ export const DEFAULT_AISLES = [
   "Tørvare",
   "Hygiejne",
   "Mælkeprodukter",
-  "Kød/fisk",
+  "Animal",
   "Drikkevare/Snacks",
   "Husholdning",
 ] as const;
@@ -18,6 +18,8 @@ export type Aisle = string;
 /** Legacy aisle labels still present in older SQLite rows. */
 const LEGACY_AISLE_MAP: Record<string, string> = {
   Vin: "Drikkevare/Snacks",
+  "Kød/fisk": "Animal",
+  "Kød/Fisk": "Animal",
 };
 
 const CONFIG_FILENAME = "kategorier.ini";
