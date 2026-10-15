@@ -67,7 +67,7 @@ Gamle varer med afdelingen `Vin` omdøbes automatisk til `Drikkevare/Snacks`.
 Ingen separat database-service — SQLite på et Volume er nok.
 
 1. Push projektet til **GitHub** og opret et nyt projekt i [Railway](https://railway.app) → **Deploy from GitHub**.
-2. Railway bygger med Nixpacks (`npm ci` → `npm run build`) og starter med `npm start` (lytter på `PORT`).
+2. Railway bygger med Nixpacks (`npm ci --include=dev --include=optional` → `npm run build` = `next build --webpack`) og starter med `npm start` (lytter på `PORT`). Production build bruger PostCSS (`@tailwindcss/postcss`) i stedet for Turbopack CSS — undgår `lightningcss.linux-x64-gnu.node` module-not-found når optional native deps mangler/fejler.
 3. Tilføj et **Volume** og mount det på **`/data`** (persistens mellem deploys).
 4. Valgfri env (anbefalet eksplicit):
    - `DATABASE_PATH=/data/indkobsliste.sqlite`  
