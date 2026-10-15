@@ -1,18 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Figtree, Syne } from "next/font/google";
 import "./globals.css";
-
-const syne = Syne({
-  variable: "--font-syne",
-  subsets: ["latin"],
-  weight: ["600", "700", "800"],
-});
-
-const figtree = Figtree({
-  variable: "--font-figtree",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
 
 export const metadata: Metadata = {
   title: "Indkøbsliste",
@@ -47,10 +34,19 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="da"
-      className={`${syne.variable} ${figtree.variable} h-full antialiased`}
-    >
+    <html lang="da" className="h-full antialiased">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className="atmosphere relative min-h-full flex flex-col font-sans">
         {children}
       </body>

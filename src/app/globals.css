@@ -53,6 +53,8 @@
 }
 
 :root {
+  --font-figtree: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-syne: "Syne", ui-sans-serif, system-ui, sans-serif;
   --background: #eef5f1;
   --foreground: #1a2e28;
   --card: #ffffffd9;
