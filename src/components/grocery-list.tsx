@@ -56,7 +56,8 @@ function groupByAisle(
     });
   }
 
-  return groups.filter((group) => group.items.length > 0);
+  // Always show every aisle (store layout), even when empty.
+  return groups;
 }
 
 export function GroceryList({ code }: { code: string }) {
@@ -397,33 +398,39 @@ export function GroceryList({ code }: { code: string }) {
       </header>
 
       {household && household.items.length === 0 ? (
-        <div className="rise-in mb-6 rounded-2xl border border-dashed border-border bg-white/40 px-5 py-10 text-center">
+        <div className="rise-in mb-4 rounded-2xl border border-dashed border-border bg-white/40 px-5 py-6 text-center">
           <p className="font-heading text-xl text-pine">Listen er tom</p>
           <p className="mt-2 text-sm text-muted-foreground">
             Tilføj den første vare nedenfor — I kan begge se den med det samme.
           </p>
         </div>
-      ) : (
+      ) : null}
+
+      {household ? (
         <div className="rise-in mb-8 space-y-5">
           {groups.map((group) => (
             <section key={group.aisle}>
               <h2 className="font-heading mb-2 text-lg font-semibold text-pine">
                 {group.aisle}
               </h2>
-              <AisleSortableList
-                aisle={group.aisle}
-                items={group.items}
-                pendingIds={pendingIds}
-                onReorder={onReorder}
-                onToggle={(item, checked) => void onToggle(item, checked)}
-                onEdit={openEdit}
-                onDelete={(item) => setConfirmDeleteId(item.id)}
-                onDraggingChange={setDragging}
-              />
+              {group.items.length === 0 ? (
+                <p className="mb-1 text-sm text-muted-foreground/80">Ingen varer</p>
+              ) : (
+                <AisleSortableList
+                  aisle={group.aisle}
+                  items={group.items}
+                  pendingIds={pendingIds}
+                  onReorder={onReorder}
+                  onToggle={(item, checked) => void onToggle(item, checked)}
+                  onEdit={openEdit}
+                  onDelete={(item) => setConfirmDeleteId(item.id)}
+                  onDraggingChange={setDragging}
+                />
+              )}
             </section>
           ))}
         </div>
-      )}
+      ) : null}
 
       {actionError ? (
         <p
