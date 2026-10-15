@@ -1,10 +1,8 @@
-# Ensure native modules (better-sqlite3) can compile on Railway.
-# Keep devDependencies available during `next build` (tailwind/turbopack/typescript).
 [phases.setup]
 nixPkgs = ["nodejs_22", "python3", "gcc", "gnumake"]
 
 [phases.install]
-cmds = ["NPM_CONFIG_PRODUCTION=false npm ci"]
+cmds = ["NPM_CONFIG_PRODUCTION=false npm ci", "npm rebuild better-sqlite3"]
 
 [phases.build]
 cmds = ["npm run build"]
