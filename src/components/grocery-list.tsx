@@ -14,6 +14,7 @@ import {
 } from "@/lib/api-client";
 import type { Household, Item } from "@/lib/types";
 import { AisleSortableList } from "@/components/aisle-sortable-list";
+import { DagensKoeb } from "@/components/dagens-koeb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -404,6 +405,14 @@ export function GroceryList({ code }: { code: string }) {
             Tilføj den første vare nedenfor — I kan begge se den med det samme.
           </p>
         </div>
+      ) : null}
+
+      {household ? (
+        <DagensKoeb
+          items={household.items}
+          pendingIds={pendingIds}
+          onToggle={(item, checked) => void onToggle(item, checked)}
+        />
       ) : null}
 
       {household ? (
