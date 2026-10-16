@@ -47,7 +47,7 @@ export function DagensKoeb({ items, pendingIds, onToggle }: Props) {
                   }}
                   aria-label={`Fjern afkrydsning for ${item.name}`}
                 />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium line-through opacity-90">
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">
                   {item.name}
                 </span>
                 <span className="shrink-0 text-[11px] font-medium tracking-wide opacity-70">
