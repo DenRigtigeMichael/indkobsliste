@@ -1,23 +1,49 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { createHousehold } from "@/lib/api-client";
+import {
+  clearLastHousehold,
+  getLastHousehold,
+  setLastHousehold,
+} from "@/lib/last-household";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const STORAGE_KEY = "indkobsliste-code";
+function subscribeNoop() {
+  return () => {};
+}
 
 export function JoinPanel() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const wantSwitch = searchParams.get("skift") === "1";
+
+  const saved = useSyncExternalStore(
+    subscribeNoop,
+    getLastHousehold,
+    () => null,
+  );
+
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"create" | "join" | null>(null);
 
+  useEffect(() => {
+    if (wantSwitch) {
+      clearLastHousehold();
+      return;
+    }
+    if (saved) {
+      router.replace(`/h/${saved}`);
+    }
+  }, [router, saved, wantSwitch]);
+
   async function goToHousehold(nextCode: string) {
     const normalized = nextCode.trim().toUpperCase();
-    localStorage.setItem(STORAGE_KEY, normalized);
+    setLastHousehold(normalized);
     router.push(`/h/${normalized}`);
   }
 
@@ -47,7 +73,9 @@ export function JoinPanel() {
     }
     setBusy("join");
     try {
-      const res = await fetch(`/api/households/${encodeURIComponent(normalized)}`);
+      const res = await fetch(
+        `/api/households/${encodeURIComponent(normalized)}`,
+      );
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
         throw new Error(data.error ?? "Husstanden findes ikke.");
@@ -63,8 +91,22 @@ export function JoinPanel() {
     }
   }
 
+  if (!wantSwitch && saved) {
+    return (
+      <div className="rise-in-delay relative z-10 mx-auto mt-8 w-full max-w-md text-center text-sm text-muted-foreground">
+        Åbner jeres liste…
+      </div>
+    );
+  }
+
   return (
     <div className="rise-in-delay relative z-10 mx-auto mt-8 w-full max-w-md space-y-5">
+      {wantSwitch ? (
+        <p className="text-center text-sm text-muted-foreground">
+          Vælg en anden husstand — eller opret en ny fælles liste.
+        </p>
+      ) : null}
+
       <Button
         type="button"
         size="lg"

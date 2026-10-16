@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, Link2, Loader2, Plus, Trash2 } from "lucide-react";
+import { setLastHousehold } from "@/lib/last-household";
 import {
   addItem,
   deleteItem,
@@ -62,6 +64,7 @@ function groupByAisle(
 }
 
 export function GroceryList({ code }: { code: string }) {
+  const router = useRouter();
   const [household, setHousehold] = useState<Household | null>(null);
   const [aisles, setAisles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,11 +146,7 @@ export function GroceryList({ code }: { code: string }) {
       void refresh(true);
     }, POLL_MS);
 
-    try {
-      localStorage.setItem("indkobsliste-code", code.toUpperCase());
-    } catch {
-      // ignore private-mode storage failures
-    }
+    setLastHousehold(code);
 
     return () => {
       alive = false;
@@ -395,6 +394,15 @@ export function GroceryList({ code }: { code: string }) {
               </div>
             </DialogContent>
           </Dialog>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => router.push("/?skift=1")}
+          >
+            Skift husstand
+          </Button>
         </div>
       </header>
 

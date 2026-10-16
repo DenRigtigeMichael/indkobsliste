@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { JoinPanel } from "@/components/join-panel";
 
 export default function HomePage() {
@@ -11,10 +12,16 @@ export default function HomePage() {
           Én fælles liste til jer to. Afkryds i butikken — den anden ser det med
           det samme.
         </p>
-        <JoinPanel />
+        <Suspense
+          fallback={
+            <p className="mt-8 text-sm text-muted-foreground">Henter…</p>
+          }
+        >
+          <JoinPanel />
+        </Suspense>
         <p className="rise-in-delay mt-10 text-xs text-muted-foreground/90">
-          Tip: På iPhone kan I tilføje siden til hjemmeskærmen via Del → Tilføj
-          til hjemmeskærm.
+          Tip: På iPhone — åbn listen først, så Del → Tilføj til hjemmeskærm.
+          Ikonet åbner jeres seneste husstand igen.
         </p>
       </div>
     </main>
