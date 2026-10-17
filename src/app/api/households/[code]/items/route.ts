@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { normalizeAisle } from "@/lib/aisles";
-import { addItem } from "@/lib/db";
+import { addItem, normalizeAisle } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

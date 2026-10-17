@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { normalizeAisle } from "@/lib/aisles";
 import {
   deleteItem,
   moveItemWithinAisle,
+  normalizeAisle,
   setItemChecked,
   updateItemDetails,
 } from "@/lib/db";

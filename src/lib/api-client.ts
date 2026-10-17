@@ -1,4 +1,4 @@
-import type { Household, Item } from "./types";
+import type { AisleDef, Household, Item } from "./types";
 
 async function parseJson<T>(response: Response): Promise<T> {
   const data = (await response.json()) as T & { error?: string };
@@ -23,9 +23,47 @@ export async function fetchHousehold(code: string): Promise<Household> {
   return parseJson<Household>(res);
 }
 
-export async function fetchAisles(): Promise<string[]> {
+export async function fetchAisles(): Promise<AisleDef[]> {
   const res = await fetch("/api/aisles", { cache: "no-store" });
-  const data = await parseJson<{ aisles: string[] }>(res);
+  const data = await parseJson<{ aisles: AisleDef[] }>(res);
+  return data.aisles;
+}
+
+export async function createAisleApi(
+  name: string,
+  color?: string,
+): Promise<AisleDef[]> {
+  const res = await fetch("/api/aisles", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, color }),
+  });
+  const data = await parseJson<{ aisles: AisleDef[] }>(res);
+  return data.aisles;
+}
+
+export async function updateAisleApi(
+  id: string,
+  details: { name?: string; color?: string },
+): Promise<AisleDef[]> {
+  const res = await fetch(`/api/aisles/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(details),
+  });
+  const data = await parseJson<{ aisles: AisleDef[] }>(res);
+  return data.aisles;
+}
+
+export async function reorderAislesApi(
+  orderedIds: string[],
+): Promise<AisleDef[]> {
+  const res = await fetch("/api/aisles/reorder", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderedIds }),
+  });
+  const data = await parseJson<{ aisles: AisleDef[] }>(res);
   return data.aisles;
 }
 

@@ -7,15 +7,20 @@ import { Check, Link2, Loader2, Plus, Trash2 } from "lucide-react";
 import { setLastHousehold } from "@/lib/last-household";
 import {
   addItem,
+  createAisleApi,
   deleteItem,
   fetchAisles,
   fetchHousehold,
   reorderAisle,
+  reorderAislesApi,
   setItemChecked,
+  updateAisleApi,
   updateItem,
 } from "@/lib/api-client";
-import type { Household, Item } from "@/lib/types";
+import type { AisleDef, Household, Item } from "@/lib/types";
+import { aisleNames } from "@/lib/types";
 import { AisleSortableList } from "@/components/aisle-sortable-list";
+import { CategoryAdmin } from "@/components/category-admin";
 import { DagensKoeb } from "@/components/dagens-koeb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,10 +45,11 @@ const POLL_MS = 2000;
 
 function groupByAisle(
   items: Item[],
-  aisles: string[],
+  aisles: AisleDef[],
 ): { aisle: string; items: Item[] }[] {
-  const known = new Set(aisles);
-  const groups = aisles.map((aisle) => ({
+  const names = aisleNames(aisles);
+  const known = new Set(names);
+  const groups = names.map((aisle) => ({
     aisle,
     items: items.filter((item) => item.aisle === aisle),
   }));
@@ -59,14 +65,13 @@ function groupByAisle(
     });
   }
 
-  // Always show every aisle (store layout), even when empty.
   return groups;
 }
 
 export function GroceryList({ code }: { code: string }) {
   const router = useRouter();
   const [household, setHousehold] = useState<Household | null>(null);
-  const [aisles, setAisles] = useState<string[]>([]);
+  const [aisles, setAisles] = useState<AisleDef[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -81,29 +86,38 @@ export function GroceryList({ code }: { code: string }) {
   const [editAisle, setEditAisle] = useState("Grønt");
   const [savingEdit, setSavingEdit] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [aisleBusy, setAisleBusy] = useState(false);
 
-  const load = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!opts?.silent) setLoading(true);
-    try {
-      const data = await fetchHousehold(code);
-      setHousehold(data);
-      if (data.aisles?.length) {
-        setAisles(data.aisles);
-        setAisle((prev) =>
-          data.aisles.includes(prev) ? prev : data.aisles[0]!,
+  const applyAisles = useCallback((next: AisleDef[]) => {
+    setAisles(next);
+    setHousehold((prev) => (prev ? { ...prev, aisles: next } : prev));
+    const names = aisleNames(next);
+    setAisle((prev) => (names.includes(prev) ? prev : names[0] ?? "Grønt"));
+    setEditAisle((prev) => (names.includes(prev) ? prev : names[0] ?? "Grønt"));
+  }, []);
+
+  const load = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!opts?.silent) setLoading(true);
+      try {
+        const data = await fetchHousehold(code);
+        setHousehold(data);
+        if (data.aisles?.length) {
+          applyAisles(data.aisles);
+        }
+        setError(null);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Kunne ikke hente listen. Prøv igen om et øjeblik.",
         );
+      } finally {
+        if (!opts?.silent) setLoading(false);
       }
-      setError(null);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Kunne ikke hente listen. Prøv igen om et øjeblik.",
-      );
-    } finally {
-      if (!opts?.silent) setLoading(false);
-    }
-  }, [code]);
+    },
+    [applyAisles, code],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -120,10 +134,7 @@ export function GroceryList({ code }: { code: string }) {
           ? data.aisles
           : aisleList ?? [];
         if (nextAisles.length) {
-          setAisles(nextAisles);
-          setAisle((prev) =>
-            nextAisles.includes(prev) ? prev : nextAisles[0]!,
-          );
+          applyAisles(nextAisles);
         }
         setError(null);
       } catch (err) {
@@ -142,7 +153,7 @@ export function GroceryList({ code }: { code: string }) {
       void refresh(false);
     }, 0);
     const id = window.setInterval(() => {
-      if (dragging) return;
+      if (dragging || aisleBusy) return;
       void refresh(true);
     }, POLL_MS);
 
@@ -153,13 +164,13 @@ export function GroceryList({ code }: { code: string }) {
       window.clearTimeout(boot);
       window.clearInterval(id);
     };
-  }, [code, dragging]);
+  }, [applyAisles, aisleBusy, code, dragging]);
 
   const aisleList = household?.aisles?.length ? household.aisles : aisles;
+  const aisleNameList = aisleNames(aisleList);
 
   const groups = useMemo(
-    () =>
-      household ? groupByAisle(household.items, aisleList) : [],
+    () => (household ? groupByAisle(household.items, aisleList) : []),
     [household, aisleList],
   );
   const shareUrl =
@@ -313,6 +324,40 @@ export function GroceryList({ code }: { code: string }) {
     }
   }
 
+  async function onCreateAisle(nameValue: string, color: string) {
+    setAisleBusy(true);
+    try {
+      const next = await createAisleApi(nameValue, color);
+      applyAisles(next);
+    } finally {
+      setAisleBusy(false);
+    }
+  }
+
+  async function onUpdateAisle(
+    id: string,
+    details: { name?: string; color?: string },
+  ) {
+    setAisleBusy(true);
+    try {
+      const next = await updateAisleApi(id, details);
+      applyAisles(next);
+      await load({ silent: true });
+    } finally {
+      setAisleBusy(false);
+    }
+  }
+
+  async function onReorderAisles(orderedIds: string[]) {
+    setAisleBusy(true);
+    try {
+      const next = await reorderAislesApi(orderedIds);
+      applyAisles(next);
+    } finally {
+      setAisleBusy(false);
+    }
+  }
+
   if (loading && !household) {
     return (
       <div className="relative z-10 flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4 text-muted-foreground">
@@ -352,7 +397,119 @@ export function GroceryList({ code }: { code: string }) {
         <p className="mt-2 max-w-sm text-base text-muted-foreground">
           Træk for at sortere. Farve viser når det er tid at købe igen.
         </p>
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+      </header>
+
+      {household && household.items.length === 0 ? (
+        <div className="rise-in mb-4 rounded-2xl border border-dashed border-border bg-white/40 px-5 py-6 text-center">
+          <p className="font-heading text-xl text-pine">Listen er tom</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Tilføj den første vare nedenfor — I kan begge se den med det samme.
+          </p>
+        </div>
+      ) : null}
+
+      {household ? (
+        <DagensKoeb
+          items={household.items}
+          aisles={aisleList}
+          pendingIds={pendingIds}
+          onToggle={(item, checked) => void onToggle(item, checked)}
+        />
+      ) : null}
+
+      {household ? (
+        <div className="rise-in mb-8 space-y-5">
+          {groups.map((group) => (
+            <section key={group.aisle}>
+              <h2 className="font-heading mb-2 text-lg font-semibold text-pine">
+                {group.aisle}
+              </h2>
+              {group.items.length === 0 ? (
+                <p className="mb-1 text-sm text-muted-foreground/80">
+                  Ingen varer
+                </p>
+              ) : (
+                <AisleSortableList
+                  aisle={group.aisle}
+                  items={group.items}
+                  pendingIds={pendingIds}
+                  onReorder={onReorder}
+                  onToggle={(item, checked) => void onToggle(item, checked)}
+                  onEdit={openEdit}
+                  onDelete={(item) => setConfirmDeleteId(item.id)}
+                  onDraggingChange={setDragging}
+                />
+              )}
+            </section>
+          ))}
+        </div>
+      ) : null}
+
+      {actionError ? (
+        <p
+          role="alert"
+          className="mb-3 rounded-lg bg-overdue px-3 py-2 text-sm text-overdue-fg"
+        >
+          {actionError}
+        </p>
+      ) : null}
+
+      <form
+        onSubmit={onAdd}
+        className="rise-in-delay space-y-3 rounded-2xl border border-border/70 bg-white/55 p-4 backdrop-blur-sm"
+      >
+        <div className="space-y-2">
+          <Label htmlFor="item-name">Tilføj vare</Label>
+          <Input
+            id="item-name"
+            placeholder="Fx avocado, mælk, opvasketabs…"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="h-11 bg-white/80"
+            disabled={adding}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="item-aisle">Afdeling</Label>
+          <Select
+            value={aisle}
+            onValueChange={(value) => {
+              if (value && aisleNameList.includes(value)) {
+                setAisle(value);
+              }
+            }}
+          >
+            <SelectTrigger id="item-aisle" className="h-11 w-full bg-white/80">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {aisleNameList.map((a) => (
+                <SelectItem key={a} value={a}>
+                  {a}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button type="submit" className="h-11 w-full" disabled={adding}>
+          <Plus className="size-4" />
+          {adding ? "Tilføjer…" : "Tilføj til listen"}
+        </Button>
+      </form>
+
+      <CategoryAdmin
+        aisles={aisleList}
+        busy={aisleBusy}
+        onCreate={onCreateAisle}
+        onUpdate={onUpdateAisle}
+        onReorder={onReorderAisles}
+      />
+
+      <footer className="mt-8 space-y-3 border-t border-border/50 pt-5">
+        <p className="text-xs font-medium tracking-wide text-muted-foreground">
+          Husstand
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-md bg-secondary px-3 py-1.5 font-mono text-sm tracking-[0.18em] text-secondary-foreground">
             {code}
           </span>
@@ -404,102 +561,7 @@ export function GroceryList({ code }: { code: string }) {
             Skift husstand
           </Button>
         </div>
-      </header>
-
-      {household && household.items.length === 0 ? (
-        <div className="rise-in mb-4 rounded-2xl border border-dashed border-border bg-white/40 px-5 py-6 text-center">
-          <p className="font-heading text-xl text-pine">Listen er tom</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Tilføj den første vare nedenfor — I kan begge se den med det samme.
-          </p>
-        </div>
-      ) : null}
-
-      {household ? (
-        <DagensKoeb
-          items={household.items}
-          pendingIds={pendingIds}
-          onToggle={(item, checked) => void onToggle(item, checked)}
-        />
-      ) : null}
-
-      {household ? (
-        <div className="rise-in mb-8 space-y-5">
-          {groups.map((group) => (
-            <section key={group.aisle}>
-              <h2 className="font-heading mb-2 text-lg font-semibold text-pine">
-                {group.aisle}
-              </h2>
-              {group.items.length === 0 ? (
-                <p className="mb-1 text-sm text-muted-foreground/80">Ingen varer</p>
-              ) : (
-                <AisleSortableList
-                  aisle={group.aisle}
-                  items={group.items}
-                  pendingIds={pendingIds}
-                  onReorder={onReorder}
-                  onToggle={(item, checked) => void onToggle(item, checked)}
-                  onEdit={openEdit}
-                  onDelete={(item) => setConfirmDeleteId(item.id)}
-                  onDraggingChange={setDragging}
-                />
-              )}
-            </section>
-          ))}
-        </div>
-      ) : null}
-
-      {actionError ? (
-        <p
-          role="alert"
-          className="mb-3 rounded-lg bg-overdue px-3 py-2 text-sm text-overdue-fg"
-        >
-          {actionError}
-        </p>
-      ) : null}
-
-      <form
-        onSubmit={onAdd}
-        className="rise-in-delay space-y-3 rounded-2xl border border-border/70 bg-white/55 p-4 backdrop-blur-sm"
-      >
-        <div className="space-y-2">
-          <Label htmlFor="item-name">Tilføj vare</Label>
-          <Input
-            id="item-name"
-            placeholder="Fx avocado, mælk, opvasketabs…"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="h-11 bg-white/80"
-            disabled={adding}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="item-aisle">Afdeling</Label>
-          <Select
-            value={aisle}
-            onValueChange={(value) => {
-              if (value && aisleList.includes(value)) {
-                setAisle(value);
-              }
-            }}
-          >
-            <SelectTrigger id="item-aisle" className="h-11 w-full bg-white/80">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {aisleList.map((a) => (
-                <SelectItem key={a} value={a}>
-                  {a}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button type="submit" className="h-11 w-full" disabled={adding}>
-          <Plus className="size-4" />
-          {adding ? "Tilføjer…" : "Tilføj til listen"}
-        </Button>
-      </form>
+      </footer>
 
       <Dialog
         open={editingItem !== null}
@@ -530,7 +592,7 @@ export function GroceryList({ code }: { code: string }) {
               <Select
                 value={editAisle}
                 onValueChange={(value) => {
-                  if (value && aisleList.includes(value)) {
+                  if (value && aisleNameList.includes(value)) {
                     setEditAisle(value);
                   }
                 }}
@@ -539,7 +601,7 @@ export function GroceryList({ code }: { code: string }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {aisleList.map((a) => (
+                  {aisleNameList.map((a) => (
                     <SelectItem key={a} value={a}>
                       {a}
                     </SelectItem>
@@ -611,7 +673,6 @@ export function GroceryList({ code }: { code: string }) {
           </div>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

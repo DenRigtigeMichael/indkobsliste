@@ -1,5 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
+import { defaultColorForAisleName } from "./aisle-colors";
+import type { AisleDef } from "./types";
+
+export type { AisleDef };
 
 /** Default if `kategorier.ini` is missing or empty. */
 export const DEFAULT_AISLES = [
@@ -12,11 +16,8 @@ export const DEFAULT_AISLES = [
   "Husholdning",
 ] as const;
 
-/** Aisle name from config (editable via kategorier.ini). */
-export type Aisle = string;
-
 /** Legacy aisle labels still present in older SQLite rows. */
-const LEGACY_AISLE_MAP: Record<string, string> = {
+export const LEGACY_AISLE_MAP: Record<string, string> = {
   Vin: "Drikkevare/Snacks",
   "Kød/fisk": "Animal",
   "Kød/Fisk": "Animal",
@@ -36,7 +37,6 @@ function parseAisleLines(text: string): string[] {
     const withoutComment = raw.replace(/#.*$/, "").trim();
     if (!withoutComment) continue;
 
-    // Support "1=Grønt" / "1 = Grønt" as well as plain "Grønt"
     const numbered = withoutComment.match(/^\d+\s*=\s*(.+)$/);
     const name = (numbered ? numbered[1]! : withoutComment).trim();
     if (!name || seen.has(name)) continue;
@@ -47,8 +47,8 @@ function parseAisleLines(text: string): string[] {
   return aisles;
 }
 
-/** Read aisles from project-root `kategorier.ini` (order preserved). */
-export function getAisles(): string[] {
+/** Names from `kategorier.ini` (or built-in defaults) — used to seed SQLite. */
+export function getSeedAisleNames(): string[] {
   try {
     const text = fs.readFileSync(configPath(), "utf8");
     const aisles = parseAisleLines(text);
@@ -59,29 +59,11 @@ export function getAisles(): string[] {
   return [...DEFAULT_AISLES];
 }
 
-export function isAisle(value: string): boolean {
-  return getAisles().includes(value);
-}
-
-/** Map current + legacy aisle strings (e.g. old `"Vin"`) to a valid aisle. */
-export function normalizeAisle(value: string): string | null {
-  const aisles = getAisles();
-  if (aisles.includes(value)) return value;
-
-  const mapped = LEGACY_AISLE_MAP[value];
-  if (mapped) {
-    if (aisles.includes(mapped)) return mapped;
-    return mapped;
-  }
-
-  return null;
-}
-
-export function getAisleOrder(): Record<string, number> {
-  return Object.fromEntries(getAisles().map((aisle, index) => [aisle, index]));
-}
-
-/** Fallback aisle when a row has an unknown label. */
-export function defaultAisle(): string {
-  return getAisles()[0] ?? "Grønt";
+/** Seed defs with default palette colors. */
+export function getSeedAisleDefs(): Omit<AisleDef, "id">[] {
+  return getSeedAisleNames().map((name, index) => ({
+    name,
+    color: defaultColorForAisleName(name),
+    sortOrder: index,
+  }));
 }

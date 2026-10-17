@@ -25,11 +25,11 @@ npm run dev
 4. Træk-og-slip for at sortere inden for afdelingen, tryk på navnet for at rette/skifte afdeling, eller fjern med skraldespanden — rækkefølgen gemmes og synces.
 5. Når en vare markeres købt, gemmes tidspunktet. Efter mindst to køb estimeres typisk interval (median). Når tiden er gået, **fremhæves varen med farve** (gul ≈ snart, koral ≈ bør købes). Afkryds/fjern flueben pr. vare via checkbox — varerne bliver på listen.
 
-## Afdelinger (rediger selv)
+## Afdelinger (kategorier)
 
-Afdelinger læses fra filen **`kategorier.ini`** i projektets rodmappe (én linje pr. afdeling, rækkefølge = butiksrækkefølge).
+Afdelinger og farver gemmes i **SQLite** (på Railway i volume `/data`), så begge telefoner ser ændringer med det samme. I bunden af listen findes **Kategorier**, hvor I kan oprette, omdøbe, farvelægge og flytte afdelinger.
 
-Standardindhold:
+Første gang appen starter, seeds kataloget fra **`kategorier.ini`** (eller indbyggede standarder):
 
 ```
 Grønt
@@ -41,18 +41,7 @@ Drikkevare/Snacks
 Husholdning
 ```
 
-**Sådan ændrer du dem**
-
-1. Åbn `kategorier.ini` i en teksteditor.
-2. Tilføj, omdøb eller flyt linjer (linjer med `#` er kommentarer).
-3. Gem filen og **genstart** appen:
-   ```bash
-   # Stop med Ctrl+C, start igen:
-   npm run dev
-   ```
-
-Gamle varer med afdelingen `Vin` omdøbes automatisk til `Drikkevare/Snacks`.
-Gamle varer med afdelingen `Kød/fisk` omdøbes automatisk til `Animal`.
+Gamle varer med `Vin` / `Kød/fisk` omdøbes automatisk til `Drikkevare/Snacks` / `Animal`.
 
 ## Scripts
 

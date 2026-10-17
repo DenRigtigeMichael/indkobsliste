@@ -3,13 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { customAlphabet } from "nanoid";
 import {
-  defaultAisle,
-  getAisleOrder,
-  getAisles,
-  normalizeAisle,
-} from "./aisles";
+  defaultColorForAisleName,
+  normalizeAisleColor,
+} from "./aisle-colors";
+import { getSeedAisleDefs, LEGACY_AISLE_MAP } from "./aisles";
 import { computeCadence, estimateIntervalDays } from "./cadence";
-import type { Household, Item } from "./types";
+import type { AisleDef, Household, Item } from "./types";
 
 const CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const makeCode = customAlphabet(CODE_ALPHABET, 6);
@@ -34,6 +33,13 @@ type ItemRow = {
   updated_at: string;
 };
 
+type AisleRow = {
+  id: string;
+  name: string;
+  color: string;
+  sort_order: number;
+};
+
 declare global {
   var __indkobslisteDb: Database.Database | undefined;
 }
@@ -45,19 +51,46 @@ function dbPath() {
     return fromEnv;
   }
 
-  // Railway Volume typically mounts at /data
   if (process.env.RAILWAY_ENVIRONMENT || fs.existsSync("/data")) {
     try {
       fs.mkdirSync("/data", { recursive: true });
       return path.join("/data", "indkobsliste.sqlite");
     } catch {
-      // fall through to local ./data
+      // fall through
     }
   }
 
   const dir = path.join(process.cwd(), "data");
   fs.mkdirSync(dir, { recursive: true });
   return path.join(dir, "indkobsliste.db");
+}
+
+function mapAisle(row: AisleRow): AisleDef {
+  return {
+    id: row.id,
+    name: row.name,
+    color: normalizeAisleColor(row.color),
+    sortOrder: row.sort_order,
+  };
+}
+
+function seedAislesIfEmpty(db: Database.Database) {
+  const count = db.prepare(`SELECT COUNT(*) AS n FROM aisles`).get() as {
+    n: number;
+  };
+  if (count.n > 0) return;
+
+  const now = new Date().toISOString();
+  const insert = db.prepare(
+    `INSERT INTO aisles (id, name, color, sort_order, created_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  );
+  const tx = db.transaction(() => {
+    for (const def of getSeedAisleDefs()) {
+      insert.run(makeId(), def.name, def.color, def.sortOrder, now);
+    }
+  });
+  tx();
 }
 
 function migrate(db: Database.Database) {
@@ -72,18 +105,35 @@ function migrate(db: Database.Database) {
     );
   }
 
-  // Rename legacy aisles to current labels
-  db.prepare(
-    `UPDATE items SET aisle = ? WHERE aisle = ?`,
-  ).run("Drikkevare/Snacks", "Vin");
-  db.prepare(
-    `UPDATE items SET aisle = ? WHERE aisle = ?`,
-  ).run("Animal", "Kød/fisk");
-  db.prepare(
-    `UPDATE items SET aisle = ? WHERE aisle = ?`,
-  ).run("Animal", "Kød/Fisk");
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS aisles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      color TEXT NOT NULL,
+      sort_order INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
 
-  // Backfill stable per-aisle order for rows still at 0 collision
+  seedAislesIfEmpty(db);
+
+  // Rename legacy aisles on items + aisle catalog
+  for (const [from, to] of Object.entries(LEGACY_AISLE_MAP)) {
+    db.prepare(`UPDATE items SET aisle = ? WHERE aisle = ?`).run(to, from);
+    db.prepare(`UPDATE aisles SET name = ? WHERE name = ?`).run(to, from);
+  }
+
+  // Ensure default colors for known names if still default/empty
+  for (const [name, color] of Object.entries(
+    Object.fromEntries(
+      getSeedAisleDefs().map((d) => [d.name, d.color]),
+    ),
+  )) {
+    db.prepare(
+      `UPDATE aisles SET color = ? WHERE name = ? AND (color = '' OR color = 'default')`,
+    ).run(color, name);
+  }
+
   const households = db
     .prepare(`SELECT code FROM households`)
     .all() as { code: string }[];
@@ -150,6 +200,14 @@ function getDb() {
         purchased_at TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS aisles (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        color TEXT NOT NULL,
+        sort_order INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
       CREATE INDEX IF NOT EXISTS idx_items_household ON items(household_code);
       CREATE INDEX IF NOT EXISTS idx_purchases_item ON purchases(item_id);
     `);
@@ -157,6 +215,156 @@ function getDb() {
   }
   migrate(globalThis.__indkobslisteDb);
   return globalThis.__indkobslisteDb;
+}
+
+export function listAisles(): AisleDef[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT id, name, color, sort_order FROM aisles ORDER BY sort_order ASC, name ASC`,
+    )
+    .all() as AisleRow[];
+  return rows.map(mapAisle);
+}
+
+export function getAisleNames(): string[] {
+  return listAisles().map((a) => a.name);
+}
+
+export function getAisleOrder(): Record<string, number> {
+  return Object.fromEntries(
+    listAisles().map((aisle) => [aisle.name, aisle.sortOrder]),
+  );
+}
+
+export function defaultAisle(): string {
+  return listAisles()[0]?.name ?? "Grønt";
+}
+
+export function normalizeAisle(value: string): string | null {
+  const aisles = getAisleNames();
+  if (aisles.includes(value)) return value;
+
+  const mapped = LEGACY_AISLE_MAP[value];
+  if (mapped) {
+    if (aisles.includes(mapped)) return mapped;
+    return mapped;
+  }
+
+  return null;
+}
+
+export function createAisle(name: string, color?: string): AisleDef {
+  const db = getDb();
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Kategorinavn mangler");
+  if (trimmed.length > 40) throw new Error("Kategorinavn er for langt");
+
+  const existing = db
+    .prepare(`SELECT id FROM aisles WHERE name = ? COLLATE NOCASE`)
+    .get(trimmed) as { id: string } | undefined;
+  if (existing) throw new Error("Kategorien findes allerede.");
+
+  const max = db
+    .prepare(`SELECT COALESCE(MAX(sort_order), -1) AS m FROM aisles`)
+    .get() as { m: number };
+
+  const id = makeId();
+  const now = new Date().toISOString();
+  const colorId = normalizeAisleColor(
+    color ?? defaultColorForAisleName(trimmed),
+  );
+  db.prepare(
+    `INSERT INTO aisles (id, name, color, sort_order, created_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(id, trimmed, colorId, max.m + 1, now);
+
+  const row = db
+    .prepare(
+      `SELECT id, name, color, sort_order FROM aisles WHERE id = ?`,
+    )
+    .get(id) as AisleRow;
+  return mapAisle(row);
+}
+
+export function updateAisle(
+  id: string,
+  details: { name?: string; color?: string },
+): AisleDef {
+  const db = getDb();
+  const existing = db
+    .prepare(
+      `SELECT id, name, color, sort_order FROM aisles WHERE id = ?`,
+    )
+    .get(id) as AisleRow | undefined;
+  if (!existing) throw new Error("Kategorien findes ikke.");
+
+  const nextName =
+    details.name !== undefined ? details.name.trim() : existing.name;
+  if (!nextName) throw new Error("Kategorinavn mangler");
+  if (nextName.length > 40) throw new Error("Kategorinavn er for langt");
+
+  const nextColor =
+    details.color !== undefined
+      ? normalizeAisleColor(details.color)
+      : normalizeAisleColor(existing.color);
+
+  if (nextName !== existing.name) {
+    const clash = db
+      .prepare(
+        `SELECT id FROM aisles WHERE name = ? COLLATE NOCASE AND id != ?`,
+      )
+      .get(nextName, id) as { id: string } | undefined;
+    if (clash) throw new Error("Kategorien findes allerede.");
+  }
+
+  const tx = db.transaction(() => {
+    db.prepare(`UPDATE aisles SET name = ?, color = ? WHERE id = ?`).run(
+      nextName,
+      nextColor,
+      id,
+    );
+    if (nextName !== existing.name) {
+      db.prepare(`UPDATE items SET aisle = ? WHERE aisle = ?`).run(
+        nextName,
+        existing.name,
+      );
+    }
+  });
+  tx();
+
+  const row = db
+    .prepare(
+      `SELECT id, name, color, sort_order FROM aisles WHERE id = ?`,
+    )
+    .get(id) as AisleRow;
+  return mapAisle(row);
+}
+
+export function reorderAisles(orderedIds: string[]): AisleDef[] {
+  const db = getDb();
+  const current = db
+    .prepare(`SELECT id FROM aisles`)
+    .all() as { id: string }[];
+  const currentIds = new Set(current.map((r) => r.id));
+
+  if (
+    orderedIds.length !== currentIds.size ||
+    orderedIds.some((id) => !currentIds.has(id))
+  ) {
+    throw new Error("Ugyldig rækkefølge for kategorier.");
+  }
+
+  const update = db.prepare(
+    `UPDATE aisles SET sort_order = ? WHERE id = ?`,
+  );
+  const tx = db.transaction(() => {
+    orderedIds.forEach((id, index) => {
+      update.run(index, id);
+    });
+  });
+  tx();
+
+  return listAisles();
 }
 
 function mapItem(row: ItemRow): Item {
@@ -209,7 +417,7 @@ function sortItems(items: Item[]): Item[] {
 function withAisles(
   household: Omit<Household, "aisles"> | Household,
 ): Household {
-  return { ...household, aisles: getAisles() };
+  return { ...household, aisles: listAisles() };
 }
 
 function getItemRow(itemId: string, householdCode: string): ItemRow | undefined {
@@ -380,7 +588,6 @@ export function moveItemWithinAisle(
   return getHousehold(household.code);
 }
 
-/** Persist a full within-aisle order (e.g. after drag-and-drop). */
 export function reorderAisleItems(
   code: string,
   aisle: string,

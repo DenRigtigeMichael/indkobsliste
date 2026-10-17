@@ -104,6 +104,15 @@
   --aisle-default-bg: #e8eee9;
   --aisle-default-border: #9aada3;
   --aisle-default-fg: #2a3d35;
+  --aisle-orange-bg: #ffe0c8;
+  --aisle-orange-border: #e0893a;
+  --aisle-orange-fg: #6b3a0e;
+  --aisle-lilla-bg: #ead9f5;
+  --aisle-lilla-border: #a06bc4;
+  --aisle-lilla-fg: #4a2860;
+  --aisle-teal-bg: #ccefeb;
+  --aisle-teal-border: #3aa89a;
+  --aisle-teal-fg: #0f4f47;
   --chart-1: #1f4d3a;
   --chart-2: #3d7ea6;
   --chart-3: #c4a35a;
