@@ -103,7 +103,7 @@ function ItemRowContent({
         <span
           className={
             item.checked
-              ? "truncate text-sm text-muted-foreground line-through"
+              ? "truncate text-sm text-muted-foreground"
               : "truncate text-sm font-medium text-foreground"
           }
         >
