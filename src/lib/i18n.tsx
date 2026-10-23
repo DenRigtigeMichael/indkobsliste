@@ -119,6 +119,8 @@ export type Messages = {
   english: string;
   privacyTitle: string;
   privacyBody: string;
+  householdSection: string;
+  householdSectionHint: string;
   close: string;
 };
 
@@ -217,7 +219,8 @@ const da: Messages = {
   settingsTitle: "Indstillinger",
   settingsBody: "Sprog og layout på denne enhed.",
   handedness: "Hånd",
-  handednessHint: "Placér «Købt» til venstre eller højre på varerækker.",
+  handednessHint:
+    "Placér «Købt» til venstre eller højre under Dagens køb.",
   leftHanded: "Venstrehåndet",
   rightHanded: "Højrehåndet",
   language: "Sprog",
@@ -227,6 +230,8 @@ const da: Messages = {
   privacyTitle: "Privatliv",
   privacyBody:
     "Varenavne krypteres på din telefon før de gemmes. Serveren ser kun ciphertext. Alle med husstandskoden kan læse listen — koden i linket er stadig hemmeligheden.",
+  householdSection: "Husstand",
+  householdSectionHint: "Kode, deling og skift af husstand.",
   close: "Luk",
 };
 
@@ -324,7 +329,8 @@ const en: Messages = {
   settingsTitle: "Settings",
   settingsBody: "Language and layout on this device.",
   handedness: "Handedness",
-  handednessHint: "Place «Bought» on the left or right of item rows.",
+  handednessHint:
+    "Place «Bought» on the left or right under Today’s buys.",
   leftHanded: "Left-handed",
   rightHanded: "Right-handed",
   language: "Language",
@@ -335,6 +341,8 @@ const en: Messages = {
   privacyTitle: "Privacy",
   privacyBody:
     "Item names are encrypted on your phone before they are stored. The server only sees ciphertext. Anyone with the household code can read the list — the code in the link is still the secret.",
+  householdSection: "Household",
+  householdSectionHint: "Code, sharing, and switching household.",
   close: "Close",
 };
 
