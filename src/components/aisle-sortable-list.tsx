@@ -28,9 +28,9 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Trash2 } from "lucide-react";
 import type { Item } from "@/lib/types";
-import { usePrefs, useT } from "@/lib/i18n";
-import type { Handedness } from "@/lib/preferences";
+import { useT } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 function topDropId(aisle: string) {
   return `__top__:${aisle}`;
@@ -47,40 +47,9 @@ function rowHighlight(item: Item): string {
   return "border-border/60 bg-white/70";
 }
 
-function BoughtControl({
-  item,
-  busy,
-  onToggle,
-}: {
-  item: Item;
-  busy: boolean;
-  onToggle: (checked: boolean) => void;
-}) {
-  const t = useT();
-  return (
-    <button
-      type="button"
-      disabled={busy}
-      onClick={() => onToggle(!item.checked)}
-      aria-pressed={item.checked}
-      aria-label={
-        item.checked ? t.unmarkBought(item.name) : t.markBought(item.name)
-      }
-      className={`h-10 shrink-0 rounded-lg px-3 text-sm font-semibold tracking-wide transition-colors disabled:opacity-60 ${
-        item.checked
-          ? "bg-pine text-primary-foreground"
-          : "border border-pine/35 bg-white/90 text-pine active:bg-secondary"
-      }`}
-    >
-      {t.bought}
-    </button>
-  );
-}
-
 function ItemRowContent({
   item,
   busy,
-  handedness,
   dragHandleProps,
   isDragging,
   onToggle,
@@ -89,7 +58,6 @@ function ItemRowContent({
 }: {
   item: Item;
   busy: boolean;
-  handedness: Handedness;
   dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
   isDragging?: boolean;
   onToggle: (checked: boolean) => void;
@@ -103,30 +71,6 @@ function ItemRowContent({
       : item.cadenceStatus === "due"
         ? t.dueSoon
         : undefined;
-
-  const bought = (
-    <BoughtControl item={item} busy={busy} onToggle={onToggle} />
-  );
-
-  const nameBtn = (
-    <button
-      type="button"
-      className="flex min-w-0 flex-1 items-center gap-2 text-left"
-      onClick={onEdit}
-      disabled={busy}
-    >
-      <span
-        className={
-          item.checked
-            ? "truncate text-sm text-muted-foreground"
-            : "truncate text-sm font-medium text-foreground"
-        }
-      >
-        {item.name}
-      </span>
-      {cueLabel ? <span className="sr-only">{cueLabel}</span> : null}
-    </button>
-  );
 
   return (
     <div
@@ -144,17 +88,30 @@ function ItemRowContent({
         <GripVertical className="size-4" />
       </button>
 
-      {handedness === "left" ? (
-        <>
-          {bought}
-          {nameBtn}
-        </>
-      ) : (
-        <>
-          {nameBtn}
-          {bought}
-        </>
-      )}
+      <Checkbox
+        checked={item.checked}
+        disabled={busy}
+        onCheckedChange={(value) => onToggle(value === true)}
+        aria-label={t.markBought(item.name)}
+      />
+
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        onClick={onEdit}
+        disabled={busy}
+      >
+        <span
+          className={
+            item.checked
+              ? "truncate text-sm text-muted-foreground"
+              : "truncate text-sm font-medium text-foreground"
+          }
+        >
+          {item.name}
+        </span>
+        {cueLabel ? <span className="sr-only">{cueLabel}</span> : null}
+      </button>
 
       <Button
         type="button"
@@ -174,14 +131,12 @@ function ItemRowContent({
 function SortableItemRow({
   item,
   busy,
-  handedness,
   onToggle,
   onEdit,
   onDelete,
 }: {
   item: Item;
   busy: boolean;
-  handedness: Handedness;
   onToggle: (checked: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -206,7 +161,6 @@ function SortableItemRow({
       <ItemRowContent
         item={item}
         busy={busy}
-        handedness={handedness}
         isDragging={isDragging}
         dragHandleProps={{ ...attributes, ...listeners }}
         onToggle={onToggle}
@@ -266,7 +220,6 @@ export function AisleSortableList({
   onDelete: (item: Item) => void;
   onDraggingChange?: (dragging: boolean) => void;
 }) {
-  const { handedness } = usePrefs();
   const [overrideItems, setOverrideItems] = useState<Item[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const dragOriginRef = useRef<Item[] | null>(null);
@@ -392,7 +345,6 @@ export function AisleSortableList({
                 key={item.id}
                 item={item}
                 busy={pendingIds.has(item.id)}
-                handedness={handedness}
                 onToggle={(checked) => onToggle(item, checked)}
                 onEdit={() => onEdit(item)}
                 onDelete={() => onDelete(item)}
@@ -407,7 +359,6 @@ export function AisleSortableList({
             <ItemRowContent
               item={activeItem}
               busy={false}
-              handedness={handedness}
               isDragging
               onToggle={() => {}}
               onEdit={() => {}}

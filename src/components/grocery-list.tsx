@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Check, Link2, Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { setLastHousehold } from "@/lib/last-household";
 import {
   addItem,
@@ -42,7 +41,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 
 const POLL_MS = 2000;
@@ -74,7 +72,6 @@ function groupByAisle(
 
 export function GroceryList({ code }: { code: string }) {
   const t = useT();
-  const router = useRouter();
   const [household, setHousehold] = useState<Household | null>(null);
   const [aisles, setAisles] = useState<AisleDef[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +80,6 @@ export function GroceryList({ code }: { code: string }) {
   const [name, setName] = useState("");
   const [aisle, setAisle] = useState("Grønt");
   const [adding, setAdding] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
@@ -338,16 +334,6 @@ export function GroceryList({ code }: { code: string }) {
     }
   }
 
-  async function copyShare() {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setActionError(t.copyFailed);
-    }
-  }
-
   async function onCreateAisle(nameValue: string, color: string) {
     setAisleBusy(true);
     try {
@@ -413,7 +399,7 @@ export function GroceryList({ code }: { code: string }) {
     <div className="relative z-10 mx-auto w-full max-w-lg px-4 pb-10 pt-6">
       <header className="brand-in relative mb-6 pr-12">
         <div className="absolute right-0 top-0">
-          <SettingsGear />
+          <SettingsGear household={{ code, shareUrl }} />
         </div>
         <p className="text-sm font-medium tracking-wide text-pine/80">
           {t.sharedHousehold}
@@ -529,62 +515,6 @@ export function GroceryList({ code }: { code: string }) {
         onUpdate={onUpdateAisle}
         onReorder={onReorderAisles}
       />
-
-      <footer className="mt-8 space-y-3 border-t border-border/50 pt-5">
-        <p className="text-xs font-medium tracking-wide text-muted-foreground">
-          {t.household}
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md bg-secondary px-3 py-1.5 font-mono text-sm tracking-[0.18em] text-secondary-foreground">
-            {code}
-          </span>
-          <Dialog>
-            <DialogTrigger
-              render={<Button type="button" variant="outline" size="sm" />}
-            >
-              <Link2 className="size-4" />
-              {t.share}
-            </DialogTrigger>
-            <DialogContent className="max-w-sm">
-              <DialogHeader>
-                <DialogTitle>{t.shareTitle}</DialogTitle>
-                <DialogDescription>{t.shareBody}</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3">
-                <div>
-                  <Label className="text-muted-foreground">{t.code}</Label>
-                  <p className="mt-1 font-mono text-2xl tracking-[0.2em]">
-                    {code}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">{t.link}</Label>
-                  <p className="mt-1 break-all text-sm">{shareUrl}</p>
-                </div>
-                <Button type="button" className="w-full" onClick={copyShare}>
-                  {copied ? (
-                    <>
-                      <Check className="size-4" />
-                      {t.copied}
-                    </>
-                  ) : (
-                    t.copyLink
-                  )}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground"
-            onClick={() => router.push("/?skift=1")}
-          >
-            {t.switchHousehold}
-          </Button>
-        </div>
-      </footer>
 
       <Dialog
         open={editingItem !== null}
