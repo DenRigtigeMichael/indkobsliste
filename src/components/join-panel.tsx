@@ -8,15 +8,18 @@ import {
   getLastHousehold,
   setLastHousehold,
 } from "@/lib/last-household";
+import { useT } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SettingsGear } from "@/components/settings-dialog";
 
 function subscribeNoop() {
   return () => {};
 }
 
 export function JoinPanel() {
+  const t = useT();
   const router = useRouter();
   const searchParams = useSearchParams();
   const wantSwitch = searchParams.get("skift") === "1";
@@ -54,11 +57,7 @@ export function JoinPanel() {
       const household = await createHousehold();
       await goToHousehold(household.code);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Kunne ikke oprette husstand. Prøv igen.",
-      );
+      setError(err instanceof Error ? err.message : t.createFailed);
       setBusy(null);
     }
   }
@@ -68,7 +67,7 @@ export function JoinPanel() {
     setError(null);
     const normalized = code.trim().toUpperCase();
     if (normalized.length < 4) {
-      setError("Indtast husstandskoden fra jeres link.");
+      setError(t.joinCodeTooShort);
       return;
     }
     setBusy("join");
@@ -78,15 +77,11 @@ export function JoinPanel() {
       );
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        throw new Error(data.error ?? "Husstanden findes ikke.");
+        throw new Error(data.error ?? t.householdMissing);
       }
       await goToHousehold(normalized);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Kunne ikke åbne husstanden. Prøv igen.",
-      );
+      setError(err instanceof Error ? err.message : t.joinFailed);
       setBusy(null);
     }
   }
@@ -94,16 +89,20 @@ export function JoinPanel() {
   if (!wantSwitch && saved) {
     return (
       <div className="rise-in-delay relative z-10 mx-auto mt-8 w-full max-w-md text-center text-sm text-muted-foreground">
-        Åbner jeres liste…
+        {t.openingList}
       </div>
     );
   }
 
   return (
     <div className="rise-in-delay relative z-10 mx-auto mt-8 w-full max-w-md space-y-5">
+      <div className="flex justify-end">
+        <SettingsGear />
+      </div>
+
       {wantSwitch ? (
         <p className="text-center text-sm text-muted-foreground">
-          Vælg en anden husstand — eller opret en ny fælles liste.
+          {t.switchHouseholdHint}
         </p>
       ) : null}
 
@@ -114,18 +113,18 @@ export function JoinPanel() {
         disabled={busy !== null}
         onClick={onCreate}
       >
-        {busy === "create" ? "Opretter…" : "Opret fælles liste"}
+        {busy === "create" ? t.creating : t.createList}
       </Button>
 
       <div className="flex items-center gap-3 text-sm text-muted-foreground">
         <div className="h-px flex-1 bg-border" />
-        <span>eller join med kode</span>
+        <span>{t.orJoinWithCode}</span>
         <div className="h-px flex-1 bg-border" />
       </div>
 
       <form onSubmit={onJoin} className="space-y-3">
         <div className="space-y-2">
-          <Label htmlFor="code">Husstandskode</Label>
+          <Label htmlFor="code">{t.householdCode}</Label>
           <Input
             id="code"
             name="code"
@@ -133,7 +132,7 @@ export function JoinPanel() {
             autoCapitalize="characters"
             autoCorrect="off"
             spellCheck={false}
-            placeholder="Fx 7K2M9P"
+            placeholder={t.codePlaceholder}
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             className="h-12 tracking-[0.2em]"
@@ -147,7 +146,7 @@ export function JoinPanel() {
           className="h-12 w-full text-base"
           disabled={busy !== null}
         >
-          {busy === "join" ? "Åbner…" : "Åbn listen"}
+          {busy === "join" ? t.opening : t.openList}
         </Button>
       </form>
 
