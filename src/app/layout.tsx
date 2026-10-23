@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Providers } from "@/components/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -32,7 +33,11 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html lang="da" className="h-full antialiased">
       <head>
@@ -48,7 +53,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
       </head>
       <body className="atmosphere relative min-h-full flex flex-col font-sans">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

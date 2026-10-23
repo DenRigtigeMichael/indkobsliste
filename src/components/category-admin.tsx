@@ -8,6 +8,7 @@ import {
   normalizeAisleColor,
 } from "@/lib/aisle-colors";
 import type { AisleDef } from "@/lib/types";
+import { useT } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +38,7 @@ export function CategoryAdmin({
   onUpdate,
   onReorder,
 }: Props) {
+  const t = useT();
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState("default");
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +55,7 @@ export function CategoryAdmin({
       setNewColor("default");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Kunne ikke oprette kategori.",
+        err instanceof Error ? err.message : t.createCategoryFailed,
       );
     }
   }
@@ -67,7 +69,7 @@ export function CategoryAdmin({
       setEditing(null);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Kunne ikke gemme kategorien.",
+        err instanceof Error ? err.message : t.saveCategoryFailed,
       );
     }
   }
@@ -86,9 +88,7 @@ export function CategoryAdmin({
       await onReorder(next.map((a) => a.id));
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Kunne ikke ændre rækkefølgen.",
+        err instanceof Error ? err.message : t.reorderCategoriesFailed,
       );
     }
   }
@@ -103,11 +103,9 @@ export function CategoryAdmin({
           id="category-admin-heading"
           className="font-heading text-lg font-semibold text-pine"
         >
-          Kategorier
+          {t.categories}
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Opret, omdøb, farvelæg og flyt afdelinger — begge telefoner ser det.
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">{t.categoriesBody}</p>
       </div>
 
       <ul className="space-y-1.5">
@@ -118,7 +116,7 @@ export function CategoryAdmin({
                 type="button"
                 className="size-8 shrink-0 rounded-md border"
                 style={aisleColorStyle(aisle.color)}
-                aria-label={`Ret farve for ${aisle.name}`}
+                aria-label={t.editColorFor(aisle.name)}
                 disabled={busy}
                 onClick={() => {
                   setEditing(aisle);
@@ -144,7 +142,7 @@ export function CategoryAdmin({
                 size="icon-sm"
                 className="size-8 shrink-0"
                 disabled={busy || index === 0}
-                aria-label={`Flyt ${aisle.name} op`}
+                aria-label={t.moveCategoryUp(aisle.name)}
                 onClick={() => void move(aisle.id, "up")}
               >
                 <ChevronUp className="size-4" />
@@ -155,7 +153,7 @@ export function CategoryAdmin({
                 size="icon-sm"
                 className="size-8 shrink-0"
                 disabled={busy || index === aisles.length - 1}
-                aria-label={`Flyt ${aisle.name} ned`}
+                aria-label={t.moveCategoryDown(aisle.name)}
                 onClick={() => void move(aisle.id, "down")}
               >
                 <ChevronDown className="size-4" />
@@ -166,19 +164,19 @@ export function CategoryAdmin({
       </ul>
 
       <form onSubmit={handleCreate} className="space-y-2 border-t border-border/50 pt-3">
-        <Label htmlFor="new-category">Ny kategori</Label>
+        <Label htmlFor="new-category">{t.newCategory}</Label>
         <div className="flex gap-2">
           <Input
             id="new-category"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Fx Frost"
+            placeholder={t.categoryPlaceholder}
             className="h-10 bg-white/80"
             disabled={busy}
           />
           <Button type="submit" className="h-10 shrink-0" disabled={busy}>
             <Plus className="size-4" />
-            Tilføj
+            {t.add}
           </Button>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -219,14 +217,12 @@ export function CategoryAdmin({
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Ret kategori</DialogTitle>
-            <DialogDescription>
-              Omdøb eller skift farve. Varer følger det nye navn.
-            </DialogDescription>
+            <DialogTitle>{t.editCategory}</DialogTitle>
+            <DialogDescription>{t.editCategoryBody}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveEdit} className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="edit-category-name">Navn</Label>
+              <Label htmlFor="edit-category-name">{t.name}</Label>
               <Input
                 id="edit-category-name"
                 value={editName}
@@ -236,7 +232,7 @@ export function CategoryAdmin({
               />
             </div>
             <div className="space-y-2">
-              <Label>Farve</Label>
+              <Label>{t.color}</Label>
               <div className="flex flex-wrap gap-1.5">
                 {AISLE_PALETTE.map((swatch) => (
                   <button
@@ -265,10 +261,10 @@ export function CategoryAdmin({
                 onClick={() => setEditing(null)}
                 disabled={busy}
               >
-                Annuller
+                {t.cancel}
               </Button>
               <Button type="submit" className="flex-1" disabled={busy}>
-                Gem
+                {t.save}
               </Button>
             </div>
           </form>

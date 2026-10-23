@@ -75,6 +75,21 @@ npm start
 DATABASE_PATH=./data/indkobsliste.db npm start
 ```
 
+## Sprog
+
+- Standard: **dansk** på `indkoebsliste.dk` / Railway / localhost.
+- Engelsk: vælg under **Indstillinger** (tandhjul), gemmes i `localStorage` på enheden.
+- Fremtidigt engelsk domæne (fx `grocerylist.*`): hostname sætter standard til engelsk automatisk — intet domænekøb i denne release; bare skift i indstillinger eller peg et engelsk hostnavn på samme app.
+
+## Kryptering (client-side)
+
+- Varenavne krypteres i browseren med **AES-GCM** før de gemmes.
+- Nøglen udledes med **PBKDF2** fra husstandskoden + et per-husstand `crypto_salt` (server) + app-pepper.
+- SQLite gemmer ciphertext (`enc1.<iv>.<ciphertext>`); udvikler/host ser ikke plaintext varenavne i DB-dumps.
+- Første load af gamle plaintext-lister migrerer automatisk (client encrypt + rewrite).
+- Afdelingsnavne (fælles katalog) er stadig plaintext — de er ikke husstands-hemmeligheder.
+- **Begrænsning:** alle med husstandskoden (inkl. koden i URL `/h/KODE`) kan dekryptere. Kryptering beskytter mod DB-adgang uden koden, ikke mod dem der har linket.
+
 ## Bemærkninger (v1-defaults)
 
 - Ingen tung auth — adgang er kendskab til husstandskoden/linket.

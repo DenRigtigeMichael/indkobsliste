@@ -27,6 +27,8 @@ export type Item = {
 export type Household = {
   code: string;
   createdAt: string;
+  /** Hex salt for client-side key derivation (PBKDF2). */
+  cryptoSalt: string;
   items: Item[];
   aisles: AisleDef[];
 };

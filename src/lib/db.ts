@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { customAlphabet } from "nanoid";
@@ -20,7 +21,12 @@ const makeId = customAlphabet(
 type HouseholdRow = {
   code: string;
   created_at: string;
+  crypto_salt: string;
 };
+
+function randomSaltHex(): string {
+  return randomBytes(16).toString("hex");
+}
 
 type ItemRow = {
   id: string;
@@ -115,6 +121,27 @@ function migrate(db: Database.Database) {
     );
   `);
 
+  const householdCols = db
+    .prepare(`PRAGMA table_info(households)`)
+    .all() as { name: string }[];
+  const householdColNames = new Set(householdCols.map((c) => c.name));
+  if (!householdColNames.has("crypto_salt")) {
+    db.exec(
+      `ALTER TABLE households ADD COLUMN crypto_salt TEXT NOT NULL DEFAULT ''`,
+    );
+  }
+  const missingSalt = db
+    .prepare(
+      `SELECT code FROM households WHERE crypto_salt IS NULL OR crypto_salt = ''`,
+    )
+    .all() as { code: string }[];
+  const setSalt = db.prepare(
+    `UPDATE households SET crypto_salt = ? WHERE code = ?`,
+  );
+  for (const { code } of missingSalt) {
+    setSalt.run(randomSaltHex(), code);
+  }
+
   seedAislesIfEmpty(db);
 
   // Rename legacy aisles on items + aisle catalog
@@ -180,7 +207,8 @@ function getDb() {
     db.exec(`
       CREATE TABLE IF NOT EXISTS households (
         code TEXT PRIMARY KEY,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        crypto_salt TEXT NOT NULL DEFAULT ''
       );
 
       CREATE TABLE IF NOT EXISTS items (
@@ -443,12 +471,18 @@ export function createHousehold(): Household {
   const db = getDb();
   const now = new Date().toISOString();
   let code = makeCode();
+  const cryptoSalt = randomSaltHex();
   for (let i = 0; i < 8; i++) {
     try {
       db.prepare(
-        `INSERT INTO households (code, created_at) VALUES (?, ?)`,
-      ).run(code, now);
-      return withAisles({ code, createdAt: now, items: [] });
+        `INSERT INTO households (code, created_at, crypto_salt) VALUES (?, ?, ?)`,
+      ).run(code, now, cryptoSalt);
+      return withAisles({
+        code,
+        createdAt: now,
+        cryptoSalt,
+        items: [],
+      });
     } catch {
       code = makeCode();
     }
@@ -459,10 +493,21 @@ export function createHousehold(): Household {
 export function getHousehold(code: string): Household | null {
   const db = getDb();
   const normalized = code.trim().toUpperCase();
-  const household = db
-    .prepare(`SELECT code, created_at FROM households WHERE code = ?`)
+  let household = db
+    .prepare(
+      `SELECT code, created_at, crypto_salt FROM households WHERE code = ?`,
+    )
     .get(normalized) as HouseholdRow | undefined;
   if (!household) return null;
+
+  if (!household.crypto_salt) {
+    const salt = randomSaltHex();
+    db.prepare(`UPDATE households SET crypto_salt = ? WHERE code = ?`).run(
+      salt,
+      household.code,
+    );
+    household = { ...household, crypto_salt: salt };
+  }
 
   const rows = db
     .prepare(
@@ -474,6 +519,7 @@ export function getHousehold(code: string): Household | null {
   return withAisles({
     code: household.code,
     createdAt: household.created_at,
+    cryptoSalt: household.crypto_salt,
     items: sortItems(rows.map(mapItem)),
   });
 }
@@ -489,8 +535,11 @@ export function addItem(
 
   const now = new Date().toISOString();
   const id = makeId();
+  // Name may be plaintext (legacy) or an opaque ciphertext envelope from the client.
+  // Never log this value — it may be sensitive plaintext during migration.
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Varenavn mangler");
+  if (trimmed.length > 2000) throw new Error("Varenavn er for langt");
 
   const sortOrder = nextSortOrder(household.code, aisle);
 
@@ -661,9 +710,11 @@ export function updateItemDetails(
   if (!existing) return null;
 
   const now = new Date().toISOString();
+  // Opaque name (ciphertext or legacy plaintext). Do not log.
   const nextName =
     details.name !== undefined ? details.name.trim() : existing.name;
   if (!nextName) throw new Error("Varenavn mangler");
+  if (nextName.length > 2000) throw new Error("Varenavn er for langt");
 
   const currentAisle =
     normalizeAisle(existing.aisle) ?? defaultAisle();

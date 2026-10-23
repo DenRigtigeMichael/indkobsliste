@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Link2, Loader2, Plus, Trash2 } from "lucide-react";
@@ -17,11 +17,15 @@ import {
   updateAisleApi,
   updateItem,
 } from "@/lib/api-client";
+import { deriveHouseholdKey } from "@/lib/crypto-client";
+import { hydrateHousehold, openItem, sealItemName } from "@/lib/crypto-sync";
+import { useT } from "@/lib/i18n";
 import type { AisleDef, Household, Item } from "@/lib/types";
 import { aisleNames } from "@/lib/types";
 import { AisleSortableList } from "@/components/aisle-sortable-list";
 import { CategoryAdmin } from "@/components/category-admin";
 import { DagensKoeb } from "@/components/dagens-koeb";
+import { SettingsGear } from "@/components/settings-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,6 +73,7 @@ function groupByAisle(
 }
 
 export function GroceryList({ code }: { code: string }) {
+  const t = useT();
   const router = useRouter();
   const [household, setHousehold] = useState<Household | null>(null);
   const [aisles, setAisles] = useState<AisleDef[]>([]);
@@ -88,6 +93,9 @@ export function GroceryList({ code }: { code: string }) {
   const [dragging, setDragging] = useState(false);
   const [aisleBusy, setAisleBusy] = useState(false);
 
+  const cryptoKeyRef = useRef<CryptoKey | null>(null);
+  const migratingIdsRef = useRef<Set<string>>(new Set());
+
   const applyAisles = useCallback((next: AisleDef[]) => {
     setAisles(next);
     setHousehold((prev) => (prev ? { ...prev, aisles: next } : prev));
@@ -96,27 +104,36 @@ export function GroceryList({ code }: { code: string }) {
     setEditAisle((prev) => (names.includes(prev) ? prev : names[0] ?? "Grønt"));
   }, []);
 
+  const unlockHousehold = useCallback(
+    async (data: Household): Promise<Household> => {
+      const key = await deriveHouseholdKey(code, data.cryptoSalt);
+      cryptoKeyRef.current = key;
+      return hydrateHousehold(data, key, {
+        code,
+        migratingIds: migratingIdsRef.current,
+      });
+    },
+    [code],
+  );
+
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
       if (!opts?.silent) setLoading(true);
       try {
         const data = await fetchHousehold(code);
-        setHousehold(data);
-        if (data.aisles?.length) {
-          applyAisles(data.aisles);
+        const unlocked = await unlockHousehold(data);
+        setHousehold(unlocked);
+        if (unlocked.aisles?.length) {
+          applyAisles(unlocked.aisles);
         }
         setError(null);
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Kunne ikke hente listen. Prøv igen om et øjeblik.",
-        );
+        setError(err instanceof Error ? err.message : t.loadFailed);
       } finally {
         if (!opts?.silent) setLoading(false);
       }
     },
-    [applyAisles, code],
+    [applyAisles, code, t.loadFailed, unlockHousehold],
   );
 
   useEffect(() => {
@@ -129,9 +146,11 @@ export function GroceryList({ code }: { code: string }) {
           silent ? Promise.resolve(null) : fetchAisles().catch(() => null),
         ]);
         if (!alive) return;
-        setHousehold(data);
-        const nextAisles = data.aisles?.length
-          ? data.aisles
+        const unlocked = await unlockHousehold(data);
+        if (!alive) return;
+        setHousehold(unlocked);
+        const nextAisles = unlocked.aisles?.length
+          ? unlocked.aisles
           : aisleList ?? [];
         if (nextAisles.length) {
           applyAisles(nextAisles);
@@ -139,11 +158,7 @@ export function GroceryList({ code }: { code: string }) {
         setError(null);
       } catch (err) {
         if (!alive) return;
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Kunne ikke hente listen. Prøv igen om et øjeblik.",
-        );
+        setError(err instanceof Error ? err.message : t.loadFailed);
       } finally {
         if (alive && !silent) setLoading(false);
       }
@@ -164,7 +179,7 @@ export function GroceryList({ code }: { code: string }) {
       window.clearTimeout(boot);
       window.clearInterval(id);
     };
-  }, [applyAisles, aisleBusy, code, dragging]);
+  }, [applyAisles, aisleBusy, code, dragging, t.loadFailed, unlockHousehold]);
 
   const aisleList = household?.aisles?.length ? household.aisles : aisles;
   const aisleNameList = aisleNames(aisleList);
@@ -191,18 +206,26 @@ export function GroceryList({ code }: { code: string }) {
     event.preventDefault();
     setActionError(null);
     if (!name.trim()) {
-      setActionError("Skriv et varenavn.");
+      setActionError(t.needItemName);
+      return;
+    }
+    const key = cryptoKeyRef.current;
+    if (!key) {
+      setActionError(t.addFailed);
       return;
     }
     setAdding(true);
     try {
-      await addItem(code, name, aisle);
+      const sealed = await sealItemName(name, key);
+      const created = await addItem(code, sealed, aisle);
+      const opened = await openItem(created, key);
       setName("");
+      setHousehold((prev) =>
+        prev ? { ...prev, items: [...prev.items, opened] } : prev,
+      );
       await load({ silent: true });
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Kunne ikke tilføje varen.",
-      );
+      setActionError(err instanceof Error ? err.message : t.addFailed);
     } finally {
       setAdding(false);
     }
@@ -223,18 +246,18 @@ export function GroceryList({ code }: { code: string }) {
     );
     try {
       const updated = await setItemChecked(code, item.id, checked);
+      const key = cryptoKeyRef.current;
+      const opened = key ? await openItem(updated, key) : { ...updated, name: item.name };
       setHousehold((prev) =>
         prev
           ? {
               ...prev,
-              items: prev.items.map((i) => (i.id === updated.id ? updated : i)),
+              items: prev.items.map((i) => (i.id === opened.id ? opened : i)),
             }
           : prev,
       );
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Kunne ikke opdatere varen.",
-      );
+      setActionError(err instanceof Error ? err.message : t.updateFailed);
       await load({ silent: true });
     } finally {
       markPending(item.id, false);
@@ -255,9 +278,7 @@ export function GroceryList({ code }: { code: string }) {
       await deleteItem(code, item.id);
     } catch (err) {
       setHousehold(previous);
-      setActionError(
-        err instanceof Error ? err.message : "Kunne ikke slette varen.",
-      );
+      setActionError(err instanceof Error ? err.message : t.deleteFailed);
     } finally {
       markPending(item.id, false);
     }
@@ -276,11 +297,10 @@ export function GroceryList({ code }: { code: string }) {
     });
     try {
       const next = await reorderAisle(code, nextAisle, orderedIds);
-      setHousehold(next);
+      const unlocked = await unlockHousehold(next);
+      setHousehold(unlocked);
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Kunne ikke ændre rækkefølgen.",
-      );
+      setActionError(err instanceof Error ? err.message : t.reorderFailed);
       await load({ silent: true });
     }
   }
@@ -294,20 +314,24 @@ export function GroceryList({ code }: { code: string }) {
   async function saveEdit(event: React.FormEvent) {
     event.preventDefault();
     if (!editingItem) return;
+    const key = cryptoKeyRef.current;
+    if (!key) {
+      setActionError(t.saveFailed);
+      return;
+    }
     setActionError(null);
     setSavingEdit(true);
     markPending(editingItem.id, true);
     try {
+      const sealed = await sealItemName(editName, key);
       await updateItem(code, editingItem.id, {
-        name: editName,
+        name: sealed,
         aisle: editAisle,
       });
       setEditingItem(null);
       await load({ silent: true });
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Kunne ikke gemme ændringen.",
-      );
+      setActionError(err instanceof Error ? err.message : t.saveFailed);
     } finally {
       markPending(editingItem.id, false);
       setSavingEdit(false);
@@ -320,7 +344,7 @@ export function GroceryList({ code }: { code: string }) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      setActionError("Kunne ikke kopiere linket. Kopiér adressen manuelt.");
+      setActionError(t.copyFailed);
     }
   }
 
@@ -362,7 +386,7 @@ export function GroceryList({ code }: { code: string }) {
     return (
       <div className="relative z-10 flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4 text-muted-foreground">
         <Loader2 className="size-7 animate-spin text-pine" aria-hidden />
-        <p>Henter jeres indkøbsliste…</p>
+        <p>{t.loadingList}</p>
       </div>
     );
   }
@@ -375,10 +399,10 @@ export function GroceryList({ code }: { code: string }) {
         </p>
         <div className="flex gap-2">
           <Button type="button" onClick={() => void load()}>
-            Prøv igen
+            {t.tryAgain}
           </Button>
           <Button type="button" variant="secondary" render={<Link href="/" />}>
-            Til forsiden
+            {t.toHome}
           </Button>
         </div>
       </div>
@@ -387,24 +411,25 @@ export function GroceryList({ code }: { code: string }) {
 
   return (
     <div className="relative z-10 mx-auto w-full max-w-lg px-4 pb-10 pt-6">
-      <header className="brand-in mb-6">
+      <header className="brand-in relative mb-6 pr-12">
+        <div className="absolute right-0 top-0">
+          <SettingsGear />
+        </div>
         <p className="text-sm font-medium tracking-wide text-pine/80">
-          Fælles husstand
+          {t.sharedHousehold}
         </p>
         <h1 className="font-heading text-4xl font-bold tracking-tight text-pine sm:text-5xl">
-          Indkøbsliste
+          {t.brand}
         </h1>
         <p className="mt-2 max-w-sm text-base text-muted-foreground">
-          Træk for at sortere. Farve viser når det er tid at købe igen.
+          {t.listTagline}
         </p>
       </header>
 
       {household && household.items.length === 0 ? (
         <div className="rise-in mb-4 rounded-2xl border border-dashed border-border bg-white/40 px-5 py-6 text-center">
-          <p className="font-heading text-xl text-pine">Listen er tom</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Tilføj den første vare nedenfor — I kan begge se den med det samme.
-          </p>
+          <p className="font-heading text-xl text-pine">{t.emptyTitle}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{t.emptyBody}</p>
         </div>
       ) : null}
 
@@ -426,7 +451,7 @@ export function GroceryList({ code }: { code: string }) {
               </h2>
               {group.items.length === 0 ? (
                 <p className="mb-1 text-sm text-muted-foreground/80">
-                  Ingen varer
+                  {t.noItems}
                 </p>
               ) : (
                 <AisleSortableList
@@ -459,10 +484,10 @@ export function GroceryList({ code }: { code: string }) {
         className="rise-in-delay space-y-3 rounded-2xl border border-border/70 bg-white/55 p-4 backdrop-blur-sm"
       >
         <div className="space-y-2">
-          <Label htmlFor="item-name">Tilføj vare</Label>
+          <Label htmlFor="item-name">{t.addItem}</Label>
           <Input
             id="item-name"
-            placeholder="Fx avocado, mælk, opvasketabs…"
+            placeholder={t.itemPlaceholder}
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="h-11 bg-white/80"
@@ -470,7 +495,7 @@ export function GroceryList({ code }: { code: string }) {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="item-aisle">Afdeling</Label>
+          <Label htmlFor="item-aisle">{t.aisle}</Label>
           <Select
             value={aisle}
             onValueChange={(value) => {
@@ -493,7 +518,7 @@ export function GroceryList({ code }: { code: string }) {
         </div>
         <Button type="submit" className="h-11 w-full" disabled={adding}>
           <Plus className="size-4" />
-          {adding ? "Tilføjer…" : "Tilføj til listen"}
+          {adding ? t.adding : t.addToList}
         </Button>
       </form>
 
@@ -507,7 +532,7 @@ export function GroceryList({ code }: { code: string }) {
 
       <footer className="mt-8 space-y-3 border-t border-border/50 pt-5">
         <p className="text-xs font-medium tracking-wide text-muted-foreground">
-          Husstand
+          {t.household}
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-md bg-secondary px-3 py-1.5 font-mono text-sm tracking-[0.18em] text-secondary-foreground">
@@ -518,34 +543,32 @@ export function GroceryList({ code }: { code: string }) {
               render={<Button type="button" variant="outline" size="sm" />}
             >
               <Link2 className="size-4" />
-              Del
+              {t.share}
             </DialogTrigger>
             <DialogContent className="max-w-sm">
               <DialogHeader>
-                <DialogTitle>Del med din partner</DialogTitle>
-                <DialogDescription>
-                  Send koden eller linket — begge åbner den samme liste.
-                </DialogDescription>
+                <DialogTitle>{t.shareTitle}</DialogTitle>
+                <DialogDescription>{t.shareBody}</DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
                 <div>
-                  <Label className="text-muted-foreground">Kode</Label>
+                  <Label className="text-muted-foreground">{t.code}</Label>
                   <p className="mt-1 font-mono text-2xl tracking-[0.2em]">
                     {code}
                   </p>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">Link</Label>
+                  <Label className="text-muted-foreground">{t.link}</Label>
                   <p className="mt-1 break-all text-sm">{shareUrl}</p>
                 </div>
                 <Button type="button" className="w-full" onClick={copyShare}>
                   {copied ? (
                     <>
                       <Check className="size-4" />
-                      Kopieret
+                      {t.copied}
                     </>
                   ) : (
-                    "Kopiér link"
+                    t.copyLink
                   )}
                 </Button>
               </div>
@@ -558,7 +581,7 @@ export function GroceryList({ code }: { code: string }) {
             className="text-muted-foreground"
             onClick={() => router.push("/?skift=1")}
           >
-            Skift husstand
+            {t.switchHousehold}
           </Button>
         </div>
       </footer>
@@ -571,14 +594,12 @@ export function GroceryList({ code }: { code: string }) {
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Ret vare</DialogTitle>
-            <DialogDescription>
-              Ændr navn eller flyt til en anden afdeling.
-            </DialogDescription>
+            <DialogTitle>{t.editItem}</DialogTitle>
+            <DialogDescription>{t.editItemBody}</DialogDescription>
           </DialogHeader>
           <form onSubmit={saveEdit} className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="edit-name">Navn</Label>
+              <Label htmlFor="edit-name">{t.name}</Label>
               <Input
                 id="edit-name"
                 value={editName}
@@ -588,7 +609,7 @@ export function GroceryList({ code }: { code: string }) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-aisle">Afdeling</Label>
+              <Label htmlFor="edit-aisle">{t.aisle}</Label>
               <Select
                 value={editAisle}
                 onValueChange={(value) => {
@@ -617,10 +638,10 @@ export function GroceryList({ code }: { code: string }) {
                 onClick={() => setEditingItem(null)}
                 disabled={savingEdit}
               >
-                Annuller
+                {t.cancel}
               </Button>
               <Button type="submit" className="flex-1" disabled={savingEdit}>
-                {savingEdit ? "Gemmer…" : "Gem"}
+                {savingEdit ? t.saving : t.save}
               </Button>
             </div>
           </form>
@@ -635,15 +656,15 @@ export function GroceryList({ code }: { code: string }) {
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Fjern vare?</DialogTitle>
+            <DialogTitle>{t.removeItem}</DialogTitle>
             <DialogDescription>
               {(() => {
                 const item = household?.items.find(
                   (i) => i.id === confirmDeleteId,
                 );
                 return item
-                  ? `“${item.name}” fjernes fra listen for jer begge.`
-                  : "Varen fjernes fra listen for jer begge.";
+                  ? t.removeItemBodyNamed(item.name)
+                  : t.removeItemBody;
               })()}
             </DialogDescription>
           </DialogHeader>
@@ -654,7 +675,7 @@ export function GroceryList({ code }: { code: string }) {
               className="flex-1"
               onClick={() => setConfirmDeleteId(null)}
             >
-              Annuller
+              {t.cancel}
             </Button>
             <Button
               type="button"
@@ -668,7 +689,7 @@ export function GroceryList({ code }: { code: string }) {
               }}
             >
               <Trash2 className="size-4" />
-              Fjern
+              {t.remove}
             </Button>
           </div>
         </DialogContent>
