@@ -7,7 +7,8 @@
     "build": "next build --webpack",
     "start": "next start -H 0.0.0.0 -p ${PORT:-43145}",
     "lint": "eslint",
-    "test:cadence": "npx tsx src/lib/cadence.test.ts"
+    "test:cadence": "npx tsx src/lib/cadence.test.ts",
+    "test:preferences": "npx tsx src/lib/preferences.test.ts"
   },
   "engines": {
     "node": ">=20"

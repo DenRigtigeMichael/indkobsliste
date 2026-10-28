@@ -4,16 +4,18 @@ export type Handedness = "left" | "right";
 const LOCALE_KEY = "indkobsliste.locale";
 const HAND_KEY = "indkobsliste.handedness";
 
-/** Hostnames that should default to English (future English domain). */
-const ENGLISH_HOST_RE =
-  /(^|\.)(grocerylist|grocery-list|shoppinglist)\b/i;
+/** Hostnames that should default to English (householdlist.eu). */
+const ENGLISH_HOSTS = new Set([
+  "householdlist.eu",
+  "www.householdlist.eu",
+]);
 
 export function defaultLocaleFromHostname(hostname: string): Locale {
-  const host = hostname.toLowerCase();
-  if (ENGLISH_HOST_RE.test(host)) {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  if (ENGLISH_HOSTS.has(host)) {
     return "en";
   }
-  // indkoebsliste.dk, railway.app, localhost → Danish
+  // indkoebsliste.dk / www, railway.app, localhost → Danish
   return "da";
 }
 
