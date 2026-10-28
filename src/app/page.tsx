@@ -22,8 +22,26 @@ function HomeContent() {
         >
           <JoinPanel />
         </Suspense>
-        <p className="rise-in-delay mt-10 text-xs text-muted-foreground/90">
-          {t.homeTip}
+
+        <section
+          aria-labelledby="install-guide-heading"
+          className="rise-in-delay mt-10 rounded-xl border border-border/50 bg-secondary/30 px-4 py-3 text-left"
+        >
+          <h2
+            id="install-guide-heading"
+            className="text-sm font-medium text-pine"
+          >
+            {t.installTitle}
+          </h2>
+          <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+            <li>{t.installIphone}</li>
+            <li>{t.installAndroid}</li>
+          </ul>
+        </section>
+
+        <p className="rise-in-delay mt-8 text-[11px] leading-relaxed text-muted-foreground/80">
+          <span className="font-medium text-muted-foreground">{t.disclaimerTitle}.</span>{" "}
+          {t.disclaimerBody}
         </p>
       </div>
     </main>
