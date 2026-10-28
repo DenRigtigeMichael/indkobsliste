@@ -23,7 +23,9 @@ import {
 export type Messages = {
   brand: string;
   homeTagline: string;
-  homeTip: string;
+  installTitle: string;
+  installIphone: string;
+  installAndroid: string;
   loadingHome: string;
   openingList: string;
   switchHouseholdHint: string;
@@ -119,6 +121,8 @@ export type Messages = {
   english: string;
   privacyTitle: string;
   privacyBody: string;
+  disclaimerTitle: string;
+  disclaimerBody: string;
   householdSection: string;
   householdSectionHint: string;
   close: string;
@@ -128,8 +132,11 @@ const da: Messages = {
   brand: "Indkøbsliste",
   homeTagline:
     "Én fælles liste til jer to. Afkryds i butikken — den anden ser det med det samme.",
-  homeTip:
-    "Tip: På iPhone — åbn listen først, så Del → Tilføj til hjemmeskærm. Ikonet åbner jeres seneste husstand igen.",
+  installTitle: "Tilføj til hjemmeskærm",
+  installIphone:
+    "iPhone: Åbn i Safari → Del → Se Mere → Føj til hjemmeskærm",
+  installAndroid:
+    "Android: Chrome-menu → Tilføj til startskærm / Installér app",
   loadingHome: "Henter…",
   openingList: "Åbner jeres liste…",
   switchHouseholdHint: "Vælg en anden husstand — eller opret en ny fælles liste.",
@@ -230,6 +237,9 @@ const da: Messages = {
   privacyTitle: "Privatliv",
   privacyBody:
     "Varenavne krypteres på din telefon før de gemmes. Serveren ser kun ciphertext. Alle med husstandskoden kan læse listen — koden i linket er stadig hemmeligheden.",
+  disclaimerTitle: "Brug på eget ansvar",
+  disclaimerBody:
+    "Privat værktøj til husstanden — ikke en professionel tjeneste. Brug på eget ansvar; ingen garanti. Varenavne krypteres på din enhed, så udvikleren kan ikke læse indholdet. Husstandskoden ligger i linket: alle med koden kan åbne listen.",
   householdSection: "Husstand",
   householdSectionHint: "Kode, deling og skift af husstand.",
   close: "Luk",
@@ -239,8 +249,11 @@ const en: Messages = {
   brand: "Grocery List",
   homeTagline:
     "One shared list for the two of you. Check items in the store — the other person sees it right away.",
-  homeTip:
-    "Tip: On iPhone — open the list first, then Share → Add to Home Screen. The icon reopens your last household.",
+  installTitle: "Add to Home Screen",
+  installIphone:
+    "iPhone: Open in Safari → Share → More → Add to Home Screen",
+  installAndroid:
+    "Android: Chrome menu → Add to Home screen / Install app",
   loadingHome: "Loading…",
   openingList: "Opening your list…",
   switchHouseholdHint: "Pick another household — or create a new shared list.",
@@ -341,6 +354,9 @@ const en: Messages = {
   privacyTitle: "Privacy",
   privacyBody:
     "Item names are encrypted on your phone before they are stored. The server only sees ciphertext. Anyone with the household code can read the list — the code in the link is still the secret.",
+  disclaimerTitle: "Use at your own risk",
+  disclaimerBody:
+    "A private household tool — not a professional service. Use at your own risk; no warranty. Item names are encrypted on your device, so the developer cannot read list contents. The household code is in the URL: anyone with the code can open the list.",
   householdSection: "Household",
   householdSectionHint: "Code, sharing, and switching household.",
   close: "Close",

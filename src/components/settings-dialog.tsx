@@ -126,6 +126,13 @@ export function SettingsGear({
             </p>
           </div>
 
+          <div className="rounded-xl border border-border/60 bg-secondary/40 px-3 py-3">
+            <p className="text-sm font-medium text-pine">{t.disclaimerTitle}</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+              {t.disclaimerBody}
+            </p>
+          </div>
+
           {household ? (
             <fieldset className="space-y-3 border-t border-border/50 pt-4">
               <legend className="text-sm font-medium">{t.householdSection}</legend>
