@@ -77,9 +77,10 @@ DATABASE_PATH=./data/indkobsliste.db npm start
 
 ## Sprog
 
-- Standard: **dansk** på `indkoebsliste.dk` / Railway / localhost.
-- Engelsk: vælg under **Indstillinger** (tandhjul), gemmes i `localStorage` på enheden.
-- Fremtidigt engelsk domæne (fx `grocerylist.*`): hostname sætter standard til engelsk automatisk — intet domænekøb i denne release; bare skift i indstillinger eller peg et engelsk hostnavn på samme app.
+- Standard efter hostnavn (første besøg / ingen override):
+  - **engelsk** på `householdlist.eu` / `www.householdlist.eu`
+  - **dansk** på `indkoebsliste.dk` / `www.indkoebsliste.dk`, Railway (`*.railway.app`) og localhost
+- Override: vælg under **Indstillinger** (tandhjul) — gemmes i `localStorage` på enheden og vinder over hostname.
 
 ## Kryptering (client-side)
 

@@ -231,7 +231,8 @@ const da: Messages = {
   leftHanded: "Venstrehåndet",
   rightHanded: "Højrehåndet",
   language: "Sprog",
-  languageHint: "Vælges pr. enhed. Engelsk domæne kan sætte standard senere.",
+  languageHint:
+    "Vælges pr. enhed. Uden valg følger standardsproget hostnavnet (householdlist.eu = engelsk).",
   danish: "Dansk",
   english: "English",
   privacyTitle: "Privatliv",
@@ -348,7 +349,7 @@ const en: Messages = {
   rightHanded: "Right-handed",
   language: "Language",
   languageHint:
-    "Per device. An English domain can set the default later.",
+    "Per device. With no choice, the hostname sets the default (householdlist.eu = English).",
   danish: "Dansk",
   english: "English",
   privacyTitle: "Privacy",
