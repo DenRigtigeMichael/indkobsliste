@@ -239,7 +239,7 @@ const da: Messages = {
     "Varenavne krypteres på din telefon før de gemmes. Serveren ser kun ciphertext. Alle med husstandskoden kan læse listen — koden i linket er stadig hemmeligheden.",
   disclaimerTitle: "Brug på eget ansvar",
   disclaimerBody:
-    "Privat værktøj til husstanden — ikke en professionel tjeneste. Brug på eget ansvar; ingen garanti. Varenavne krypteres på din enhed, så udvikleren kan ikke læse indholdet. Husstandskoden ligger i linket: alle med koden kan åbne listen.",
+    "Privat værktøj til husstanden — ikke en professionel tjeneste. Brug på eget ansvar; ingen garanti.",
   householdSection: "Husstand",
   householdSectionHint: "Kode, deling og skift af husstand.",
   close: "Luk",
@@ -356,7 +356,7 @@ const en: Messages = {
     "Item names are encrypted on your phone before they are stored. The server only sees ciphertext. Anyone with the household code can read the list — the code in the link is still the secret.",
   disclaimerTitle: "Use at your own risk",
   disclaimerBody:
-    "A private household tool — not a professional service. Use at your own risk; no warranty. Item names are encrypted on your device, so the developer cannot read list contents. The household code is in the URL: anyone with the code can open the list.",
+    "A private household tool — not a professional service. Use at your own risk; no warranty.",
   householdSection: "Household",
   householdSectionHint: "Code, sharing, and switching household.",
   close: "Close",
