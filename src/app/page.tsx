@@ -39,10 +39,21 @@ function HomeContent() {
           </ul>
         </section>
 
-        <p className="rise-in-delay mt-8 text-[11px] leading-relaxed text-muted-foreground/80">
-          <span className="font-medium text-muted-foreground">{t.disclaimerTitle}.</span>{" "}
-          {t.disclaimerBody}
-        </p>
+        <div className="rise-in-delay mt-8 space-y-3 text-left">
+          <div className="rounded-xl border border-border/60 bg-secondary/40 px-3 py-3">
+            <p className="text-sm font-medium text-pine">{t.privacyTitle}</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+              {t.privacyBody}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border/60 bg-secondary/40 px-3 py-3">
+            <p className="text-sm font-medium text-pine">{t.disclaimerTitle}</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+              {t.disclaimerBody}
+            </p>
+          </div>
+        </div>
       </div>
     </main>
   );
