@@ -1,4 +1,4 @@
-/** Persisted so iOS home-screen (manifest start_url `/`) reopens the last list. */
+/** Persisted so iOS home-screen / PWA (manifest start_url `/?source=pwa`) reopens the last list. */
 export const LAST_HOUSEHOLD_KEY = "indkobsliste:lastHousehold";
 
 /** Older key used before the PWA redirect fix — migrated on read. */

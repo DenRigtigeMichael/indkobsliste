@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { setLastHousehold } from "@/lib/last-household";
+import { householdShareUrl } from "@/lib/site-url";
 import {
   addItem,
   createAisleApi,
@@ -186,7 +187,7 @@ export function GroceryList({ code }: { code: string }) {
   );
   const shareUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}/h/${code}`
+      ? householdShareUrl(window.location.origin, code)
       : `/h/${code}`;
 
   function markPending(id: string, on: boolean) {

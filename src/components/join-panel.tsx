@@ -8,6 +8,7 @@ import {
   getLastHousehold,
   setLastHousehold,
 } from "@/lib/last-household";
+import { isHomeScreenLaunch } from "@/lib/site-url";
 import { useT } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,12 +24,24 @@ export function JoinPanel() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const wantSwitch = searchParams.get("skift") === "1";
+  const sourcePwa = searchParams.get("source") === "pwa";
 
   const saved = useSyncExternalStore(
     subscribeNoop,
     getLastHousehold,
     () => null,
   );
+
+  // Window-only standalone check — server snapshot false avoids hydration mismatch.
+  const standaloneShell = useSyncExternalStore(
+    subscribeNoop,
+    () => isHomeScreenLaunch({ get: () => null }),
+    () => false,
+  );
+
+  // Only auto-open last list from home-screen / PWA — never hijack Safari
+  // deep links that landed on `/` (e.g. apex forward that stripped /h/CODE).
+  const fromHomeScreen = sourcePwa || standaloneShell;
 
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -39,10 +52,10 @@ export function JoinPanel() {
       clearLastHousehold();
       return;
     }
-    if (saved) {
+    if (fromHomeScreen && saved) {
       router.replace(`/h/${saved}`);
     }
-  }, [router, saved, wantSwitch]);
+  }, [fromHomeScreen, router, saved, wantSwitch]);
 
   async function goToHousehold(nextCode: string) {
     const normalized = nextCode.trim().toUpperCase();
@@ -86,7 +99,7 @@ export function JoinPanel() {
     }
   }
 
-  if (!wantSwitch && saved) {
+  if (!wantSwitch && fromHomeScreen && saved) {
     return (
       <div className="rise-in-delay relative z-10 mx-auto mt-8 w-full max-w-md text-center text-sm text-muted-foreground">
         {t.openingList}
