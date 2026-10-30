@@ -119,6 +119,8 @@ export type Messages = {
   languageHint: string;
   danish: string;
   english: string;
+  cadenceTitle: string;
+  cadenceBody: string;
   privacyTitle: string;
   privacyBody: string;
   disclaimerTitle: string;
@@ -235,6 +237,9 @@ const da: Messages = {
     "Vælges pr. enhed. Uden valg følger standardsproget hostnavnet (householdlist.eu = engelsk).",
   danish: "Dansk",
   english: "English",
+  cadenceTitle: "Tid til at købe igen",
+  cadenceBody:
+    "Farverne bygger på tiden mellem jeres «købt»-afkrydsninger på samme vare. Når det typiske interval er gået igen, fremhæves varen: blød gul når det snart er tid, varmere farve når I bør købe nu. Der skal mindst to tidligere køb til, før farven kan læres.",
   privacyTitle: "Privatliv",
   privacyBody:
     "Varenavne krypteres på din telefon før de gemmes. Serveren ser kun ciphertext. Alle med husstandskoden kan læse listen — koden i linket er stadig hemmeligheden.",
@@ -352,6 +357,9 @@ const en: Messages = {
     "Per device. With no choice, the hostname sets the default (householdlist.eu = English).",
   danish: "Dansk",
   english: "English",
+  cadenceTitle: "Time to buy again",
+  cadenceBody:
+    "Colors are based on the time between your «bought» checkmarks on the same item. When that usual interval has elapsed again, the item is highlighted: soft yellow when due soon, a warmer tint when you should buy now. At least two past purchases are needed before a color can be learned.",
   privacyTitle: "Privacy",
   privacyBody:
     "Item names are encrypted on your phone before they are stored. The server only sees ciphertext. Anyone with the household code can read the list — the code in the link is still the secret.",
