@@ -120,6 +120,13 @@ export function SettingsGear({
           </fieldset>
 
           <div className="rounded-xl border border-border/60 bg-secondary/40 px-3 py-3">
+            <p className="text-sm font-medium text-pine">{t.cadenceTitle}</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+              {t.cadenceBody}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border/60 bg-secondary/40 px-3 py-3">
             <p className="text-sm font-medium text-pine">{t.privacyTitle}</p>
             <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
               {t.privacyBody}
