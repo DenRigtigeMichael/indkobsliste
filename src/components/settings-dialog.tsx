@@ -70,7 +70,7 @@ export function SettingsGear({
           <DialogDescription>{t.settingsBody}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5">
+        <div className="space-y-5 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium">{t.handedness}</legend>
             <p className="text-xs text-muted-foreground">{t.handednessHint}</p>
