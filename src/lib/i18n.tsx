@@ -128,6 +128,35 @@ export type Messages = {
   householdSection: string;
   householdSectionHint: string;
   close: string;
+
+  adminTitle: string;
+  adminTagline: string;
+  adminDisabledTitle: string;
+  adminDisabledBody: string;
+  adminPassword: string;
+  adminSignIn: string;
+  adminSigningIn: string;
+  adminSignOut: string;
+  adminSigningOut: string;
+  adminBadPassword: string;
+  adminSignInFailed: string;
+  adminRefresh: string;
+  adminLoadFailed: string;
+  adminTotal: string;
+  adminTotalHint: string;
+  adminActive7: string;
+  adminActive7Hint: string;
+  adminActiveWeek: string;
+  adminActiveWeekHint: (weekStart: string) => string;
+  adminCreatedWeek: string;
+  adminCreatedWeekHint: string;
+  adminHistoryTitle: string;
+  adminHistoryHint: string;
+  adminWeek: string;
+  adminHouseholds: string;
+  adminThisWeek: string;
+  adminThrottleNote: string;
+  adminUpdated: string;
 };
 
 const da: Messages = {
@@ -249,6 +278,40 @@ const da: Messages = {
   householdSection: "Husstand",
   householdSectionHint: "Kode, deling og skift af husstand.",
   close: "Luk",
+
+  adminTitle: "Admin",
+  adminTagline: "Samlede tal for husstande.",
+  adminDisabledTitle: "Admin er slået fra",
+  adminDisabledBody:
+    "Siden forbliver lukket, indtil den er slået til på serveren.",
+  adminPassword: "Adgangskode",
+  adminSignIn: "Log ind",
+  adminSigningIn: "Logger ind…",
+  adminSignOut: "Log ud",
+  adminSigningOut: "Logger ud…",
+  adminBadPassword: "Forkert adgangskode.",
+  adminSignInFailed: "Kunne ikke logge ind. Prøv igen.",
+  adminRefresh: "Opdater",
+  adminLoadFailed: "Kunne ikke hente tallene.",
+  adminTotal: "Husstande i alt",
+  adminTotalHint: "Alle husstande der er oprettet i appen.",
+  adminActive7: "Aktive seneste 7 dage",
+  adminActive7Hint:
+    "Husstande der har åbnet deres liste inden for de seneste 7 døgn (rullende vindue, UTC).",
+  adminActiveWeek: "Aktive denne ISO-uge",
+  adminActiveWeekHint: (weekStart) =>
+    `Husstande der har åbnet deres liste i den aktuelle ISO-uge (mandag–søndag, UTC). Ugen startede ${weekStart}.`,
+  adminCreatedWeek: "Nye denne ISO-uge",
+  adminCreatedWeekHint: "Husstande oprettet siden mandag kl. 00:00 UTC.",
+  adminHistoryTitle: "Seneste uger",
+  adminHistoryHint:
+    "Antal forskellige husstande med aktivitet i hver ISO-uge (UTC). At åbne listen tæller. Uger fra før denne optælling er udfyldt ud fra hvornår husstanden blev oprettet, og ud fra varernes og købenes tidspunkter.",
+  adminWeek: "Uge fra",
+  adminHouseholds: "Husstande",
+  adminThisWeek: "Denne uge",
+  adminThrottleNote:
+    "Et åbent liste-faneblad tæller, også uden ændringer. Tidspunktet gemmes højst hvert 15. minut.",
+  adminUpdated: "Opdateret",
 };
 
 const en: Messages = {
@@ -369,6 +432,39 @@ const en: Messages = {
   householdSection: "Household",
   householdSectionHint: "Code, sharing, and switching household.",
   close: "Close",
+
+  adminTitle: "Admin",
+  adminTagline: "Aggregate household figures.",
+  adminDisabledTitle: "Admin is turned off",
+  adminDisabledBody: "This page stays closed until it is turned on for the server.",
+  adminPassword: "Password",
+  adminSignIn: "Sign in",
+  adminSigningIn: "Signing in…",
+  adminSignOut: "Sign out",
+  adminSigningOut: "Signing out…",
+  adminBadPassword: "Wrong password.",
+  adminSignInFailed: "Could not sign in. Try again.",
+  adminRefresh: "Refresh",
+  adminLoadFailed: "Could not load the figures.",
+  adminTotal: "Households in total",
+  adminTotalHint: "Every household created in the app.",
+  adminActive7: "Active in the last 7 days",
+  adminActive7Hint:
+    "Households that opened their list within the last 7 days (rolling window, UTC).",
+  adminActiveWeek: "Active this ISO week",
+  adminActiveWeekHint: (weekStart) =>
+    `Households that opened their list during the current ISO week (Monday–Sunday, UTC). The week started ${weekStart}.`,
+  adminCreatedWeek: "New this ISO week",
+  adminCreatedWeekHint: "Households created since Monday 00:00 UTC.",
+  adminHistoryTitle: "Recent weeks",
+  adminHistoryHint:
+    "Distinct households with activity in each ISO week (UTC). Opening the list counts. Weeks from before this tracking started are filled in from when the household was created and from item and purchase times.",
+  adminWeek: "Week of",
+  adminHouseholds: "Households",
+  adminThisWeek: "This week",
+  adminThrottleNote:
+    "An open list counts, even with no edits. The timestamp is saved at most every 15 minutes.",
+  adminUpdated: "Updated",
 };
 
 const DICTS: Record<Locale, Messages> = { da, en };
