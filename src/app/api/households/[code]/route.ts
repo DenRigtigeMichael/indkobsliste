@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getHousehold } from "@/lib/db";
+import { getHousehold, noteHouseholdSeen } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +15,11 @@ export async function GET(_request: Request, { params }: Params) {
         { error: "Husstanden findes ikke. Tjek koden og prøv igen." },
         { status: 404 },
       );
+    }
+    try {
+      noteHouseholdSeen(household.code);
+    } catch (seenError) {
+      console.error(seenError);
     }
     return NextResponse.json(household);
   } catch (error) {

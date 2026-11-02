@@ -8,6 +8,15 @@ import {
   normalizeAisleColor,
 } from "./aisle-colors";
 import { getSeedAisleDefs, LEGACY_AISLE_MAP } from "./aisles";
+import {
+  ACTIVITY_THROTTLE_MS,
+  backfillSeenFromStamps,
+  fillWeekCounts,
+  isoWeekStartUtc,
+  rollingWindowStart,
+  shouldRecordSeen,
+  type AdminStats,
+} from "./admin-stats";
 import { computeCadence, estimateIntervalDays } from "./cadence";
 import type { AisleDef, Household, Item } from "./types";
 
@@ -130,6 +139,24 @@ function migrate(db: Database.Database) {
       `ALTER TABLE households ADD COLUMN crypto_salt TEXT NOT NULL DEFAULT ''`,
     );
   }
+  if (!householdColNames.has("last_seen_at")) {
+    db.exec(`ALTER TABLE households ADD COLUMN last_seen_at TEXT`);
+  }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS household_weeks (
+      household_code TEXT NOT NULL REFERENCES households(code) ON DELETE CASCADE,
+      week_start TEXT NOT NULL,
+      seen_at TEXT NOT NULL,
+      PRIMARY KEY (household_code, week_start)
+    );
+    CREATE TABLE IF NOT EXISTS schema_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_household_weeks_start ON household_weeks(week_start);
+    CREATE INDEX IF NOT EXISTS idx_households_last_seen ON households(last_seen_at);
+  `);
+  backfillHouseholdActivity(db);
   const missingSalt = db
     .prepare(
       `SELECT code FROM households WHERE crypto_salt IS NULL OR crypto_salt = ''`,
@@ -208,7 +235,8 @@ function getDb() {
       CREATE TABLE IF NOT EXISTS households (
         code TEXT PRIMARY KEY,
         created_at TEXT NOT NULL,
-        crypto_salt TEXT NOT NULL DEFAULT ''
+        crypto_salt TEXT NOT NULL DEFAULT '',
+        last_seen_at TEXT
       );
 
       CREATE TABLE IF NOT EXISTS items (
@@ -236,13 +264,216 @@ function getDb() {
         created_at TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS household_weeks (
+        household_code TEXT NOT NULL REFERENCES households(code) ON DELETE CASCADE,
+        week_start TEXT NOT NULL,
+        seen_at TEXT NOT NULL,
+        PRIMARY KEY (household_code, week_start)
+      );
+
+      CREATE TABLE IF NOT EXISTS schema_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+
       CREATE INDEX IF NOT EXISTS idx_items_household ON items(household_code);
       CREATE INDEX IF NOT EXISTS idx_purchases_item ON purchases(item_id);
+      CREATE INDEX IF NOT EXISTS idx_household_weeks_start ON household_weeks(week_start);
     `);
     globalThis.__indkobslisteDb = db;
   }
   migrate(globalThis.__indkobslisteDb);
   return globalThis.__indkobslisteDb;
+}
+
+const seenMemory = new Map<string, { at: number; week: string }>();
+
+/**
+ * Record that a household list was loaded. Writes are skipped when the same
+ * ISO week was already recorded inside ACTIVITY_THROTTLE_MS, so list polling
+ * does not write on every request. A week boundary still records immediately.
+ */
+export function noteHouseholdSeen(code: string, now = new Date()): void {
+  const db = getDb();
+  const normalized = code.trim().toUpperCase();
+  if (!normalized) return;
+
+  const week = isoWeekStartUtc(now);
+  const cached = seenMemory.get(normalized);
+  if (
+    cached &&
+    cached.week === week &&
+    now.getTime() >= cached.at &&
+    now.getTime() - cached.at < ACTIVITY_THROTTLE_MS
+  ) {
+    return;
+  }
+
+  const row = db
+    .prepare(`SELECT last_seen_at FROM households WHERE code = ?`)
+    .get(normalized) as { last_seen_at: string | null } | undefined;
+  if (!row) return;
+
+  if (!shouldRecordSeen(row.last_seen_at, now)) {
+    const prevMs = row.last_seen_at ? Date.parse(row.last_seen_at) : Number.NaN;
+    seenMemory.set(normalized, {
+      at: Number.isNaN(prevMs) ? now.getTime() : prevMs,
+      week:
+        row.last_seen_at && !Number.isNaN(prevMs)
+          ? isoWeekStartUtc(new Date(prevMs))
+          : week,
+    });
+    return;
+  }
+
+  const iso = now.toISOString();
+  const tx = db.transaction(() => {
+    db.prepare(
+      `UPDATE households
+       SET last_seen_at = ?
+       WHERE code = ? AND (last_seen_at IS NULL OR last_seen_at < ?)`,
+    ).run(iso, normalized, iso);
+    db.prepare(
+      `INSERT INTO household_weeks (household_code, week_start, seen_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(household_code, week_start) DO UPDATE SET
+         seen_at = CASE
+           WHEN excluded.seen_at > household_weeks.seen_at THEN excluded.seen_at
+           ELSE household_weeks.seen_at
+         END`,
+    ).run(normalized, week, iso);
+  });
+  tx();
+  seenMemory.set(normalized, { at: now.getTime(), week });
+}
+
+export function getAdminStats(now = new Date()): AdminStats {
+  const db = getDb();
+  const total = db.prepare(`SELECT COUNT(*) AS n FROM households`).get() as {
+    n: number;
+  };
+  const active7 = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM households
+       WHERE last_seen_at IS NOT NULL AND last_seen_at >= ?`,
+    )
+    .get(rollingWindowStart(now)) as { n: number };
+  const weekStart = isoWeekStartUtc(now);
+  const activeWeek = db
+    .prepare(`SELECT COUNT(*) AS n FROM household_weeks WHERE week_start = ?`)
+    .get(weekStart) as { n: number };
+  const createdWeek = db
+    .prepare(`SELECT COUNT(*) AS n FROM households WHERE created_at >= ?`)
+    .get(`${weekStart}T00:00:00.000Z`) as { n: number };
+
+  const earliest = fillWeekCounts(now, new Map())[0]?.weekStart ?? weekStart;
+  const rows = db
+    .prepare(
+      `SELECT week_start, COUNT(*) AS n
+       FROM household_weeks
+       WHERE week_start >= ?
+       GROUP BY week_start`,
+    )
+    .all(earliest) as { week_start: string; n: number }[];
+
+  return {
+    totalHouseholds: total.n,
+    activeLast7Days: active7.n,
+    activeIsoWeek: activeWeek.n,
+    createdIsoWeek: createdWeek.n,
+    isoWeekStart: weekStart,
+    generatedAt: now.toISOString(),
+    weeks: fillWeekCounts(
+      now,
+      new Map(rows.map((row) => [row.week_start, row.n])),
+    ),
+  };
+}
+
+function backfillHouseholdActivity(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS schema_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS household_weeks (
+      household_code TEXT NOT NULL REFERENCES households(code) ON DELETE CASCADE,
+      week_start TEXT NOT NULL,
+      seen_at TEXT NOT NULL,
+      PRIMARY KEY (household_code, week_start)
+    );
+    CREATE INDEX IF NOT EXISTS idx_household_weeks_start ON household_weeks(week_start);
+  `);
+
+  const flag = database.prepare(
+    `SELECT value FROM schema_meta WHERE key = ?`,
+  );
+  const householdsStmt = database.prepare(
+    `SELECT code, created_at FROM households`,
+  );
+  const itemStmt = database.prepare(
+    `SELECT created_at, updated_at FROM items WHERE household_code = ?`,
+  );
+  const purchaseStmt = database.prepare(
+    `SELECT p.purchased_at AS purchased_at
+     FROM purchases p
+     INNER JOIN items i ON i.id = p.item_id
+     WHERE i.household_code = ?`,
+  );
+  const setSeen = database.prepare(
+    `UPDATE households
+     SET last_seen_at = ?
+     WHERE code = ? AND (last_seen_at IS NULL OR last_seen_at < ?)`,
+  );
+  const insertWeek = database.prepare(
+    `INSERT INTO household_weeks (household_code, week_start, seen_at)
+     VALUES (?, ?, ?)
+     ON CONFLICT(household_code, week_start) DO UPDATE SET
+       seen_at = CASE
+         WHEN excluded.seen_at > household_weeks.seen_at THEN excluded.seen_at
+         ELSE household_weeks.seen_at
+       END`,
+  );
+  const mark = database.prepare(
+    `INSERT INTO schema_meta (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO NOTHING`,
+  );
+
+  const tx = database.transaction(() => {
+    const existing = flag.get("activity_backfill_v1") as
+      | { value: string }
+      | undefined;
+    if (existing) return;
+
+    const households = householdsStmt.all() as {
+      code: string;
+      created_at: string;
+    }[];
+    for (const household of households) {
+      const stamps = [household.created_at];
+      const items = itemStmt.all(household.code) as {
+        created_at: string;
+        updated_at: string;
+      }[];
+      for (const item of items) {
+        stamps.push(item.created_at, item.updated_at);
+      }
+      const purchases = purchaseStmt.all(household.code) as {
+        purchased_at: string;
+      }[];
+      for (const purchase of purchases) stamps.push(purchase.purchased_at);
+
+      const derived = backfillSeenFromStamps(stamps);
+      if (!derived) continue;
+      setSeen.run(derived.lastSeenAt, household.code, derived.lastSeenAt);
+      for (const week of derived.weeks) {
+        insertWeek.run(household.code, week.weekStart, week.seenAt);
+      }
+    }
+
+    mark.run("activity_backfill_v1", new Date().toISOString());
+  });
+  tx();
 }
 
 export function listAisles(): AisleDef[] {

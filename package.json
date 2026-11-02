@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test:cadence": "npx tsx src/lib/cadence.test.ts",
     "test:preferences": "npx tsx src/lib/preferences.test.ts",
-    "test:site-url": "npx tsx src/lib/site-url.test.ts"
+    "test:site-url": "npx tsx src/lib/site-url.test.ts",
+    "test:admin": "npx tsx src/lib/admin-stats.test.ts"
   },
   "engines": {
     "node": ">=20"
